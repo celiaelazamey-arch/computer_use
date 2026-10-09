@@ -1,0 +1,21 @@
+services:
+  ollama:
+    image: "${OLLAMA_IMAGE:-ollama/ollama:latest}"
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  qdrant:
+    image: "${QDRANT_IMAGE:-qdrant/qdrant:latest}"
+    profiles: ["memory"]
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  qdrant_data:
