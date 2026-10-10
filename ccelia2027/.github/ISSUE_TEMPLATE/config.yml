@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/sayedelazameydesign-crypto/ccelia2027/security/advisories/new
+    about: Read SECURITY.md and use private vulnerability reporting. Do not post exploit details publicly.

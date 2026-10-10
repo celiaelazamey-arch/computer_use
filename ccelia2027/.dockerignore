@@ -1,0 +1,14 @@
+.git
+.github
+.devcontainer
+.wrangler
+coverage
+dist
+node_modules
+docs
+tests
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+*.log

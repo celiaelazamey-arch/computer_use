@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101218" />
+    <meta
+      name="description"
+      content="Manus Mini: مساعد عربي يخطط وينفذ قراءة عامة للويب في متصفح سحابي."
+    />
+    <title>Manus Mini | وكيل ويب آمن</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="mark">M</span
+          ><span>manus mini<br /><small>مساعدك للويب العام</small></span>
+        </div>
+        <div class="top-right">
+          <span id="service-pill" class="pill offline">جارٍ فحص الخدمة</span
+          ><button id="logout" class="quiet" hidden>خروج آمن</button>
+        </div>
+      </header>
+      <main class="layout">
+        <section class="workspace" aria-label="المحادثة">
+          <div class="intro">
+            <div class="eyebrow">خطط. راجع. نفّذ.</div>
+            <h1>ابحث في الويب،<br />بدليل واضح.</h1>
+            <p>
+              أنشئ خطة أولًا، راجعها، ثم اقرأ صفحة عامة بجلسة Playwright قصيرة.
+              لا تسجيل دخول للمواقع أو تفاعل معها أو إرسال أو حذف أو تعديل. لا
+              نشغّل JavaScript داخل الصفحات؛ قد لا يظهر المحتوى الذي يعتمد عليه.
+            </p>
+          </div>
+          <div id="thread" class="thread" aria-live="polite"></div>
+          <form id="composer" class="composer">
+            <textarea
+              id="task"
+              maxlength="2000"
+              aria-label="مهمة البحث"
+              placeholder="اكتب رابطًا عامًا لقراءته أو موضوعًا للبحث عنه..."
+              required
+            ></textarea>
+            <div class="composer-bottom">
+              <small
+                >سجل المحادثة يُحفظ في هذا المتصفح فقط. لا تكتب كلمات مرور أو
+                أسرارًا، ولا تفتح رابطًا ينفذ إجراءً بمجرد تحميله.</small
+              ><button id="send" class="send" aria-label="أنشئ خطة">↑</button>
+            </div>
+          </form>
+        </section>
+        <aside class="side" aria-label="حالة التنفيذ">
+          <section class="card">
+            <h2>خدمات التشغيل</h2>
+            <p>النموذج: <b id="model">جارٍ الفحص</b></p>
+            <p>المتصفح: <b>Cloudflare Browser Run · Playwright</b></p>
+            <p>النمط: <b>قراءة فقط</b></p>
+            <p id="config" class="notice" hidden></p>
+          </section>
+          <section class="card">
+            <h2>كيف تعمل</h2>
+            <p>١. النموذج ينشئ خطة منظمة.</p>
+            <p>٢. راجع الموقع والهدف قبل التشغيل.</p>
+            <p>٣. المتصفح السحابي يفتح الصفحة ويستخرج النص.</p>
+            <p>٤. النموذج يلخص النص الذي قُرئ بالفعل.</p>
+          </section>
+          <section class="card cost">
+            <h2>حماية الحصة والتكلفة</h2>
+            <p>
+              حجز داخلي محافظ: حتى ٥ محاولات متصفح في اليوم، دقيقتان محجوزتان
+              لكل محاولة، و٢٨ استدعاء AI.
+            </p>
+            <p>لا يوجد مزود احتياطي مدفوع. عند الحد أو الخطأ، تتوقف المهمة.</p>
+            <p>هذه الحدود لا تستبدل ضبط حساب Cloudflare على الخطة المجانية.</p>
+          </section>
+        </aside>
+      </main>
+      <footer>
+        لا يُنفّذ التطبيق تسجيل الدخول للمواقع أو إرسال النماذج أو أي تغيير
+        خارجي.
+      </footer>
+    </div>
+    <div id="login-layer" class="overlay" hidden>
+      <form id="login-form" class="dialog">
+        <span class="eyebrow">Manus Mini</span>
+        <h2>مساحة خاصة</h2>
+        <p>أدخل كلمة مرور الوصول التي أعدّها مالك الخدمة.</p>
+        <input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          maxlength="512"
+          required
+        />
+        <button class="primary" type="submit">دخول آمن</button>
+        <p id="login-error" class="bad" role="alert"></p>
+      </form>
+    </div>
+    <script type="module">
+      const thread = document.querySelector("#thread");
+      const form = document.querySelector("#composer");
+      const taskBox = document.querySelector("#task");
+      const sendButton = document.querySelector("#send");
+      const activeTokens = new Map();
+      const STORAGE_KEY = "manus-mini-browser-history-v1";
+      let busy = false;
+      let controller;
+      let messages = [];
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        if (Array.isArray(saved))
+          messages = saved
+            .filter(
+              (item) =>
+                item &&
+                ["user", "assistant"].includes(item.role) &&
+                typeof item.content === "string",
+            )
+            .slice(-40);
+      } catch {
+        messages = [];
+      }
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+      function persist() {
+        try {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(messages.slice(-40)),
+          );
+        } catch {}
+      }
+      function setBusy(value, stopped = false) {
+        busy = value;
+        sendButton.disabled = value;
+        sendButton.textContent = value ? "…" : "↑";
+        document.querySelector("#service-pill").textContent = value
+          ? "المهمة قيد التنفيذ"
+          : stopped
+            ? "توقفت المهمة"
+            : "الخدمة جاهزة";
+        document.querySelector("#service-pill").className =
+          `pill${stopped ? " offline" : ""}`;
+      }
+      function render() {
+        thread.replaceChildren();
+        if (!messages.length) {
+          const welcome = el("div", "welcome");
+          welcome.append(el("strong", "", "ابدأ بمهمة عامة منخفضة المخاطر"));
+          welcome.append(
+            el(
+              "p",
+              "",
+              "مثال: افتح https://developers.cloudflare.com/workers-ai/platform/pricing/ واستخرج حد الاستخدام المجاني.",
+            ),
+          );
+          const samples = el("div", "samples");
+          for (const value of [
+            "افتح https://example.com واقرأ عنوان الصفحة",
+            "ابحث عن أحدث وثائق Cloudflare Workers AI",
+          ]) {
+            const button = el("button", "", value);
+            button.type = "button";
+            button.addEventListener("click", () => {
+              taskBox.value = value;
+              taskBox.focus();
+            });
+            samples.append(button);
+          }
+          welcome.append(samples);
+          thread.append(welcome);
+        }
+        for (const message of messages) {
+          const card = el("article", `message ${message.role}`);
+          card.append(
+            el("div", "label", message.role === "user" ? "أنت" : "Manus Mini"),
+          );
+          card.append(el("div", "content", message.content || "جارٍ العمل..."));
+          if (message.plan) {
+            const plan = el("section", "plan");
+            plan.append(el("h3", "", "خطة مقترحة للمراجعة"));
+            plan.append(el("p", "", message.plan.analysis));
+            plan.append(
+              el(
+                "p",
+                "meta",
+                message.plan.action === "search"
+                  ? `بحث على الويب: ${message.plan.query}`
+                  : `الموقع: ${message.plan.url}`,
+              ),
+            );
+            plan.append(el("p", "meta", `السبب: ${message.plan.reason}`));
+            plan.append(
+              el(
+                "p",
+                "meta",
+                "التنفيذ المسموح: فتح صفحة عامة وقراءة النص فقط.",
+              ),
+            );
+            const row = el("div", "action-row");
+            let approved = false;
+            if (message.plan.requiresConfirmation) {
+              const label = el("label", "confirm-line");
+              const checkbox = document.createElement("input");
+              checkbox.type = "checkbox";
+              checkbox.addEventListener("change", () => {
+                approved = checkbox.checked;
+                button.disabled = !approved || busy;
+              });
+              label.append(
+                checkbox,
+                el(
+                  "span",
+                  "",
+                  "أؤكد أن التنفيذ للقراءة العامة فقط، دون إرسال أو تغيير.",
+                ),
+              );
+              plan.append(label);
+            }
+            const button = el(
+              "button",
+              "primary",
+              activeTokens.has(message.id)
+                ? "راجع ثم نفّذ القراءة"
+                : "انتهت صلاحية الخطة؛ أنشئ خطة جديدة",
+            );
+            button.type = "button";
+            button.disabled =
+              !activeTokens.has(message.id) ||
+              busy ||
+              (message.plan.requiresConfirmation && !approved);
+            button.addEventListener("click", () =>
+              runPlan(message.id, button, approved),
+            );
+            row.append(button);
+            plan.append(row);
+            card.append(plan);
+          }
+          if (message.result) {
+            const result = el("section", "result");
+            result.append(el("h3", "", "النتيجة"));
+            result.append(
+              el(
+                "p",
+                "",
+                message.result.answer ||
+                  message.result.error ||
+                  "انتهت المهمة دون ملخص.",
+              ),
+            );
+            if (Array.isArray(message.result.steps)) {
+              const list = el("ol", "steps");
+              for (const step of message.result.steps)
+                list.append(el("li", "", step));
+              result.append(list);
+            }
+            if (message.result.evidence) {
+              const evidence = el("div", "evidence");
+              evidence.append(
+                el("b", "", message.result.evidence.title || "دليل الصفحة"),
+              );
+              const link = el("a", "", message.result.evidence.url);
+              link.href = message.result.evidence.url;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              evidence.append(document.createElement("br"), link);
+              if (message.result.evidence.reservedBrowserMs)
+                evidence.append(
+                  el(
+                    "p",
+                    "meta",
+                    `الميزانية المحجوزة للمحاولة: حتى ${Math.round(message.result.evidence.reservedBrowserMs / 1000)} ثانية (حد محافظ، ليس قياسًا فعليًا)`,
+                  ),
+                );
+              evidence.append(
+                el("blockquote", "", message.result.evidence.excerpt || ""),
+              );
+              result.append(evidence);
+            }
+            card.append(result);
+          }
+          thread.append(card);
+        }
+        thread.scrollTop = thread.scrollHeight;
+        persist();
+      }
+      async function requestJson(path, payload, signal) {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+          signal,
+          credentials: "same-origin",
+        });
+        const result = await response.json().catch(() => ({}));
+        if (response.status === 401)
+          document.querySelector("#login-layer").hidden = false;
+        if (!response.ok)
+          throw new Error(
+            result.error || `تعذر إكمال الطلب (${response.status}).`,
+          );
+        return result;
+      }
+      async function makePlan(value) {
+        if (busy) return;
+        const task = value.trim();
+        if (!task) return;
+        messages.push({ id: crypto.randomUUID(), role: "user", content: task });
+        const assistant = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "",
+        };
+        messages.push(assistant);
+        taskBox.value = "";
+        setBusy(true);
+        render();
+        controller = new AbortController();
+        try {
+          const data = await requestJson(
+            "/api/plan",
+            { task },
+            controller.signal,
+          );
+          assistant.content = "راجع الخطة أدناه. لن يبدأ المتصفح تلقائيًا.";
+          assistant.plan = data.plan;
+          activeTokens.set(assistant.id, data.planToken);
+          document.querySelector("#model").textContent = data.model;
+        } catch (error) {
+          assistant.content = error.message || "تعذر إنشاء الخطة.";
+          assistant.error = true;
+        } finally {
+          controller = null;
+          setBusy(false, Boolean(assistant.error));
+          render();
+        }
+      }
+      async function runPlan(id, button, confirmed) {
+        const token = activeTokens.get(id);
+        if (!token || busy) return;
+        const message = messages.find((item) => item.id === id);
+        if (!message) return;
+        setBusy(true);
+        button.disabled = true;
+        message.content = "المتصفح يفتح الصفحة العامة ويقرأها الآن.";
+        render();
+        controller = new AbortController();
+        try {
+          const result = await requestJson(
+            "/api/execute",
+            { planToken: token, confirmed },
+            controller.signal,
+          );
+          message.result = result;
+          activeTokens.delete(id);
+          document.querySelector("#model").textContent =
+            result.model || "Workers AI";
+        } catch (error) {
+          message.result = {
+            error: error.message || "تعذر تنفيذ المهمة بأمان.",
+          };
+        } finally {
+          controller = null;
+          setBusy(false, Boolean(message.result?.error));
+          render();
+        }
+      }
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        makePlan(taskBox.value);
+      });
+      document
+        .querySelector("#login-form")
+        .addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const error = document.querySelector("#login-error");
+          error.textContent = "";
+          try {
+            await requestJson("/api/login", {
+              password: document.querySelector("#password").value,
+            });
+            document.querySelector("#password").value = "";
+            document.querySelector("#login-layer").hidden = true;
+            document.querySelector("#logout").hidden = false;
+          } catch (failure) {
+            error.textContent = failure.message;
+          }
+        });
+      document.querySelector("#logout").addEventListener("click", async () => {
+        try {
+          await requestJson("/api/logout", {});
+        } finally {
+          location.reload();
+        }
+      });
+      async function initialize() {
+        render();
+        try {
+          const status = await fetch("/api/status", { cache: "no-store" }).then(
+            (response) => response.json(),
+          );
+          document.querySelector("#model").textContent =
+            status.model || "غير متاح";
+          const pill = document.querySelector("#service-pill");
+          pill.textContent = status.configured
+            ? "الخدمات مهيأة"
+            : "الإعداد ناقص";
+          pill.className = `pill${status.configured ? "" : " offline"}`;
+          if (!status.configured) {
+            const notice = document.querySelector("#config");
+            notice.hidden = false;
+            notice.textContent =
+              "أضف إعدادات الأسرار والربط قبل الاستخدام. لا تُرسل أي مهمة الآن.";
+          }
+          const session = await fetch("/api/session", {
+            cache: "no-store",
+          }).then((response) => response.json());
+          if (session.authenticated)
+            document.querySelector("#logout").hidden = false;
+          else document.querySelector("#login-layer").hidden = false;
+        } catch {
+          document.querySelector("#service-pill").textContent =
+            "الخدمة غير متاحة";
+          document.querySelector("#config").hidden = false;
+          document.querySelector("#config").textContent =
+            "تعذر فحص الخدمات. لم يبدأ أي تنفيذ.";
+        }
+      }
+      render();
+      initialize();
+    </script>
+  </body>
+</html>
