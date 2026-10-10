@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Bring the local Python planner and hosted read-only Worker together under one monorepo workflow while keeping runtime, data, provider, and credential boundaries separate.
+- Add root install and full-check commands; extend CI, CodeQL, and Dependabot coverage to both applications.
+
 ## 0.1.0
 
 - Deliver a local CLI that converts a goal and optional text context into a strict JSON plan through Ollama.

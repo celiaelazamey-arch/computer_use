@@ -50,7 +50,7 @@ See [Development](docs/development.md) for workflow details.
 - **GitHub Pages:** no longer deploys this app because Pages would not provide its same-origin Worker API.
 - **Container:** no container image is built or published by the active monorepo workflows. A nested workflow template is retained under `ccelia2027/.github/workflows/container.yml` and is inactive here.
 
-See [Deployment](docs/deployment.md) and the monorepo-root [overlay instructions](../CCELIA2027-DEPLOYMENT.md).
+See [Deployment](docs/deployment.md), the monorepo [system architecture](../docs/system-architecture.md), and the root [operations and deployment guide](../CCELIA2027-DEPLOYMENT.md).
 
 Read [Free-tier limits](docs/free-tier.md) before using or deploying. Do not deploy if the Cloudflare account is Paid or has billing enabled.
 

@@ -1,6 +1,26 @@
-# cela.sh
+# CELA Monorepo
+
+## مخطط التخطيط المحلي cela.sh
 
 نظام تخطيط محلي قابل لإعادة الاستخدام: CLI موحدة، إعداد مركزي، وحقن اعتمادات اختياري لـ Ollama وQdrant. يستقبل هدفاً وسياقاً نصياً، ويتحقق من الخطة ويصنفها. لا يلتقط الشاشة ولا ينفذ النقرات أو الأوامر؛ كل مخرجاته `dry_run=true` و`execution_enabled=false`.
+
+## المستودع كنظام واحد
+
+يجمع هذا المستودع واجهتين لـ CELA مع إبقاء حدود التشغيل والأمان واضحة:
+
+- `cela.sh`: مخطط محلي بـ Python وOllama، يعيد خطة JSON فقط ولا ينفذها.
+- `ccelia2027/`: واجهة ويب وCloudflare Worker لقراءة صفحات HTTPS عامة فقط عبر جلسات Browser Run قصيرة ومعزولة.
+
+هما مكوّنان للمنتج نفسه لكنهما ليسا خدمة واحدة وقت التشغيل: لا يستدعي Worker مخطط Python، ولا يستخدم Python أسرار Cloudflare أو Browser Run. مخططاهما ومزوّداهما مختلفان عمداً؛ CI والجودة والتوثيق وإدارة الاعتماديات هي الطبقة الموحدة للمستودع. راجع [معمارية النظام](docs/system-architecture.md).
+
+لتثبيت وفحص المستودع كاملًا، يلزم Python 3.11+ وBash وNode.js 22.13+ مع npm:
+
+```bash
+bash ./cela.sh install-all
+bash ./cela.sh check-all
+```
+
+`check-all` يشغّل اختبارات Python وبناء حزمة Python، واختبارات Worker وLint والتنسيق وتدقيق npm وبناء Wrangler التجريبي. لا يشغّل Ollama أو Browser Run حيًا ولا ينشر إلى الإنتاج. لتشغيل واجهة Worker محليًا بعد التثبيت: `bash ./cela.sh worker-dev`؛ قد تتطلب الربط مع خدمات Cloudflare الحية اعتمادًا وإذنًا منفصلين.
 
 ## البدء
 
@@ -58,11 +78,14 @@ print(plan.model_dump_json(indent=2))
 - `src/cela_sh/memory/`: عقد الذاكرة، مخزن اختباري مؤقت، embeddings، ومحول Qdrant REST.
 - `tests/`: اختبارات offline؛ `integration_plan_probe.py` لفحص توليد الخطة الحي و`integration_live_probe.py` لفحص الذاكرة الحي الاختياري.
 - `docs/`: المعمارية والبروتوكول وقائمة تسليم التشغيل.
+- `ccelia2027/`: تطبيق Worker مستقل داخل المستودع؛ استخدم [دليل تشغيله](ccelia2027/README.md) و[دليل النشر الموحد](CCELIA2027-DEPLOYMENT.md).
+- `.github/workflows/`: CI لكلا التطبيقين، CodeQL لـ JavaScript وPython، ونشر Worker يدوي فقط.
 
 ## الأوامر والفحوص
 
 ```bash
 bash ./cela.sh test
+bash ./cela.sh check-all
 bash ./cela.sh probe
 bash ./cela.sh probe-memory
 bash ./cela.sh services-stop

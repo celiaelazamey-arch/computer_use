@@ -1,34 +1,54 @@
-# Ccelia2027 Worker Overlay
+# CELA Monorepo Operations and Worker Deployment
 
-This additive package places the Worker in `ccelia2027/` inside the existing `computer_use` repository. It does not replace the Python project or its README.
+This repository is one product with two deliberately separate runtime components. Preserve both; do not replace the local planner with the hosted Worker or connect their credentials/data without a separate design review.
 
-## Apply
+## System Map
 
-Extract this ZIP at the root of `computer_use`. Merge its files into the repository; if a root `.github/workflows/` directory already exists, keep its unrelated workflows. The overlay adds:
+- `cela.sh` is the local Python planner. It uses Ollama, optionally retrieves session-isolated Qdrant memories, validates and classifies a plan, and always returns `dry_run=true` with `execution_enabled=false`.
+- `ccelia2027/` is the Cloudflare Worker web app. It uses Workers AI and short-lived Browser Run sessions to read public HTTPS pages. It does not log in, click, type, submit forms, or mutate websites.
+- The components have separate plan schemas, providers, storage, and secrets. They do not call one another. Shared root CI, CodeQL, dependency updates, docs, and repository commands make them one maintained monorepo.
+- Only workflows in the repository-root `.github/workflows/` are active. Nested Worker workflows are retained templates. No push automatically deploys the Worker.
 
-- `ccelia2027/` — Worker source, tests, configuration, static UI, and project documentation.
-- `.github/workflows/ci.yml` and `.github/workflows/codeql.yml` — active root CI and security scanning.
-- `.github/workflows/deploy-ccelia2027.yml` — manual-only root deployment workflow.
-- `.github/workflows/nvidia-nim-smoke-test.yml` — optional, separate NVIDIA probe; it is not a Worker provider or deployment step.
-- `.github/dependabot.yml` — root dependency-update configuration.
-- `CCELIA2027-DEPLOYMENT.md` — these instructions.
+See [System Architecture](docs/system-architecture.md) for data flows and trust boundaries.
 
-GitHub discovers workflows only in the repository-root `.github/workflows/`. Any workflow examples retained under `ccelia2027/.github/workflows/` are inactive in this monorepo. No push to `main` automatically deploys the Worker.
+## Local Setup and Checks
 
-## GitHub Settings
+Requirements for the complete monorepo are Python 3.11+, Bash, Node.js 22.13+, and npm. Ollama and Docker are optional for the Python live-planning probe; they are not required for offline tests. Cloudflare credentials are not needed for unit tests.
 
-In the repository's Actions secrets, configure `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `APP_ACCESS_PASSWORD`, and `SESSION_SECRET`. Use an access password of at least 16 characters and a random session secret of at least 32 characters. Configure `CLOUDFLARE_FREE_TIER_VERIFIED` as a repository variable, not a secret; set it to `true` only after checking the account in Cloudflare.
+```bash
+bash ./cela.sh install-all
+bash ./cela.sh check-all
+```
 
-The token must be authorized for the same Cloudflare account as `CLOUDFLARE_ACCOUNT_ID`. For least privilege, create the empty Worker once in the dashboard, then scope the GitHub token as `Editor` to that Worker. Wrangler also needs permission to inspect and write Worker secrets. See [Workers roles](https://developers.cloudflare.com/workers/authorization/workers/) and [secret API permissions](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/secrets/methods/list/).
+`check-all` is the local equivalent of the root CI gate: Python tests and wheel build, Worker lint/format/tests, high-severity npm audit, and a Wrangler dry-run build. It does not call Ollama, Browser Run, NVIDIA, or a production deployment. The Python-only commands and optional live probes are documented in the root [README](README.md).
 
-Before deploying, verify the account is on Workers Free with no Workers Paid plan, billing profile, payment method, or automatic billing. If Cloudflare asks for a card, billing activation, or upgrade, stop. The workflow's checkbox and repository variable are operator attestations, not an independent billing check.
+## Production Deployment Gate
 
-The root CI workflow runs tests, formatting, lint, dependency audit, and a Wrangler dry-run build on pushes and pull requests to `main`. To deploy, open **Actions → Deploy Ccelia2027 Worker (manual) → Run workflow**, select `main`, and check the Free-tier attestation only after verifying the dashboard. The workflow runs the same checks before deployment. It creates the Worker script before storing the app secrets, then deploys again; the app fails closed until those secrets exist.
+The only active production route is `.github/workflows/deploy-ccelia2027.yml`, manually dispatched from `main`. Before using it, the account owner must inspect Cloudflare directly and confirm all of the following:
 
-## Credential Safety
+- Workers Free is active.
+- No Workers Paid plan, billing profile, payment method, or automatic billing is enabled.
+- No card, billing activation, or upgrade is requested by Cloudflare.
+- The previous Cloudflare token noted below is revoked; a replacement token is limited to the intended account/Worker and stored directly in GitHub Actions Secrets.
 
-A Google password was exposed in the chat and was not used; change it before signing in. A Cloudflare API token was also exposed and was reported as revoked, but that could not be independently confirmed. Before deploying, ensure that token is revoked and use a replacement entered directly in GitHub Settings. Never send secrets in chat.
+The workflow input `free_tier_verified` and repository variable `CLOUDFLARE_FREE_TIER_VERIFIED=true` are operator attestations, not an API check. Set them only after the account owner has verified the dashboard. If the account state is uncertain or paid, deployment is blocked.
 
-The previous Cloudflare API request was blocked by an IP restriction. A GitHub-hosted runner may be blocked too. Do not broaden the token's IP allowlist just to make the workflow pass; use an already authorized runner or an approved deployment route.
+Required GitHub Actions secrets are `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `APP_ACCESS_PASSWORD` (at least 16 characters), and `SESSION_SECRET` (random, at least 32 characters). Never place values in source, issues, reports, or chat. The workflow validates required values without printing them, reruns tests, formatting, lint, dependency audit, and a Wrangler dry run, then deploys and stores the application secrets.
 
-An earlier revision was deployed and its health/status endpoints were checked. This updated overlay has not been deployed. Live model/browser checks still require an authorized deployment, and only the account owner can verify the billing configuration.
+The earlier Cloudflare API request was blocked by an IP restriction. A GitHub-hosted runner may also be blocked. Do not broaden the token IP allowlist to force the deploy; stop and use only an already authorized runner or another explicitly approved route.
+
+## After an Authorized Deploy
+
+1. Use the `workers.dev` origin reported by the successful deployment.
+2. Confirm `/health` returns `ok: true` and `/api/status` returns `configured: true`.
+3. Sign in with the application access password and run one low-risk public read, such as reading the title and a short excerpt from `https://example.com`.
+4. Confirm the returned evidence and task-specific summary are visible. Stop if the service is unavailable, quota is exhausted, or the result is unexpected. Do not switch to a paid plan for testing.
+5. Test the earlier DNS failure only after obtaining the exact public HTTPS URL. Remove credentials or secret query values before sharing it. The Worker must stop before Browser Run when lookup fails, no public address is returned, or any address is private/reserved.
+
+An earlier revision had health/status checks, but commit `f09a850` and later fixes have not been deployed. No live model/Browser Run task or account billing inspection has been verified.
+
+## Credential Incident Notes
+
+- A Google password was exposed in an earlier chat and was not used. Change it before using that account to sign in.
+- A Cloudflare API token was exposed and was reported as revoked, but revocation was not independently confirmed. Confirm revocation and use a replacement stored directly in GitHub Settings.
+- Never send passwords, API tokens, account secrets, or payment details through this repository or chat.
