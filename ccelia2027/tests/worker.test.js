@@ -225,6 +225,32 @@ describe("Ccelia read-only agent Worker", () => {
     });
   });
 
+  it("fails closed until application secrets are available", async () => {
+    const { env, calls } = createEnvironment();
+    delete env.APP_ACCESS_PASSWORD;
+    delete env.SESSION_SECRET;
+
+    const loginResponse = await worker.fetch(
+      post("/api/login", { password: "not-used" }),
+      env,
+    );
+    const planResponse = await worker.fetch(
+      post("/api/plan", { task: "open https://example.com" }),
+      env,
+    );
+    const executeResponse = await worker.fetch(
+      post("/api/execute", { planToken: "not-used" }),
+      env,
+    );
+
+    assert.deepEqual(
+      [loginResponse.status, planResponse.status, executeResponse.status],
+      [503, 503, 503],
+    );
+    assert.equal(calls.ai, 0);
+    assert.equal(calls.browser, 0);
+  });
+
   it("serves the static UI through the configured assets binding", async () => {
     const { env } = createEnvironment();
     const response = await worker.fetch(

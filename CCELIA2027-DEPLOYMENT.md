@@ -22,6 +22,8 @@ Before deploying, verify the account is on Workers Free with no Workers Paid pla
 
 Then open **Actions → Deploy Ccelia2027 Worker (manual) → Run workflow**, select `main`, and check the Free-tier attestation only after the dashboard verification. The workflow runs tests, lint, and a dry-run build before deployment. It stores the two application secrets in the Worker without printing their values.
 
+On the first deployment, the workflow creates the Worker script before uploading secrets, then deploys it again. Since `workers.dev` is enabled, the static UI and health/status endpoints can briefly be public before the secrets are installed. Login, planning, and execution remain disabled during that interval; the Worker fails closed until the secrets are present.
+
 ## Credential Safety
 
 A Google password was exposed in the chat and was not used; change it before signing in. A Cloudflare API token was also exposed and was reported as revoked, but that could not be independently confirmed. Before deploying, ensure that token is revoked and use a replacement entered directly in GitHub Settings. Never send secrets in chat.
