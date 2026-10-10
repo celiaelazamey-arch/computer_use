@@ -37,8 +37,10 @@ function createState() {
 function createEnvironment({
   plan = goodPlan,
   aiError,
+  summaryError,
   browserError,
   budgetAllowed = true,
+  password = "local-test-password",
 } = {}) {
   const state = createState();
   const actor = new DailyBudget(state);
@@ -50,16 +52,21 @@ function createEnvironment({
     routeDecisions: [],
   };
   const env = {
-    APP_ACCESS_PASSWORD: "local-test-password",
+    APP_ACCESS_PASSWORD: password,
     SESSION_SECRET: secret,
     AI: {
       async run(_model, input) {
         calls.ai += 1;
         if (aiError) throw aiError;
+        const isPlanner =
+          input.messages[0].content.includes("planning component");
+        if (isPlanner) calls.plannerInput = input.messages[1].content;
+        else {
+          calls.summaryInput = input.messages[1].content;
+          if (summaryError) throw summaryError;
+        }
         return {
-          response: input.messages[0].content.includes("planning component")
-            ? plan
-            : "تم التحقق من نص الصفحة العامة.",
+          response: isPlanner ? plan : "تم التحقق من نص الصفحة العامة.",
         };
       },
     },
@@ -185,7 +192,12 @@ async function login(env) {
   return response.headers.get("set-cookie").split(";", 1)[0];
 }
 
-async function withDnsAnswers(addresses, callback, ipv6Addresses = []) {
+async function withDnsAnswers(
+  addresses,
+  callback,
+  ipv6Addresses = [],
+  status = 0,
+) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -198,7 +210,7 @@ async function withDnsAnswers(addresses, callback, ipv6Addresses = []) {
     const answers = type === "A" ? addresses : ipv6Addresses;
     return new Response(
       JSON.stringify({
-        Status: 0,
+        Status: status,
         Answer: answers.map((data) => ({ type: type === "A" ? 1 : 28, data })),
       }),
       { headers: { "content-type": "application/dns-json" } },
@@ -247,6 +259,28 @@ describe("Ccelia read-only agent Worker", () => {
       [loginResponse.status, planResponse.status, executeResponse.status],
       [503, 503, 503],
     );
+    assert.equal(calls.ai, 0);
+    assert.equal(calls.browser, 0);
+  });
+
+  it("rejects an application password below the minimum length", async () => {
+    const { env, calls } = createEnvironment({ password: "too-short" });
+    const status = await worker.fetch(
+      new Request("https://agent.test/api/status"),
+      env,
+    );
+    const loginResponse = await worker.fetch(
+      post("/api/login", { password: "too-short" }),
+      env,
+    );
+    const planResponse = await worker.fetch(
+      post("/api/plan", { task: "open https://example.com" }),
+      env,
+    );
+
+    assert.equal((await status.json()).configured, false);
+    assert.equal(loginResponse.status, 503);
+    assert.equal(planResponse.status, 503);
     assert.equal(calls.ai, 0);
     assert.equal(calls.browser, 0);
   });
@@ -306,6 +340,9 @@ describe("Ccelia read-only agent Worker", () => {
       value.plan.steps.map((step) => step.action),
       ["NAVIGATE", "OBSERVE"],
     );
+    assert.deepEqual(JSON.parse(calls.plannerInput), {
+      task: "افتح https://example.com واقرأ الصفحة",
+    });
     assert.ok(value.planToken);
     assert.equal(value.model, "@cf/meta/llama-3.2-3b-instruct");
     assert.equal(calls.ai, 1);
@@ -326,6 +363,34 @@ describe("Ccelia read-only agent Worker", () => {
       assert.equal(response.status, 502);
       assert.equal((await response.json()).planToken, undefined);
     }
+  });
+
+  it("rejects a navigation URL that the user did not request", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const response = await worker.fetch(
+      post("/api/plan", { task: "اقرأ صفحة عامة" }, cookie),
+      env,
+    );
+
+    assert.equal(response.status, 422);
+    assert.equal((await response.json()).planToken, undefined);
+    assert.equal(calls.browser, 0);
+  });
+
+  it("matches URLs followed by Arabic punctuation", async () => {
+    const { env } = createEnvironment();
+    const cookie = await login(env);
+    const response = await worker.fetch(
+      post(
+        "/api/plan",
+        { task: "افتح https://example.com، واقرأ الصفحة" },
+        cookie,
+      ),
+      env,
+    );
+
+    assert.equal(response.status, 200);
   });
 
   it("requires separate confirmation for sensitive requests", async () => {
@@ -365,12 +430,9 @@ describe("Ccelia read-only agent Worker", () => {
   it("uses a short-lived Playwright session with same-origin read-only requests", async () => {
     const { env, calls } = createEnvironment();
     const cookie = await login(env);
+    const task = "افتح https://example.com واقرأ الصفحة";
     const planned = await worker.fetch(
-      post(
-        "/api/plan",
-        { task: "افتح https://example.com واقرأ الصفحة" },
-        cookie,
-      ),
+      post("/api/plan", { task }, cookie),
       env,
     );
     const plan = await planned.json();
@@ -402,7 +464,66 @@ describe("Ccelia read-only agent Worker", () => {
     assert.match(result.answer, /تم التحقق/);
     assert.equal(result.evidence.title, "Example Domain");
     assert.equal(result.evidence.reservedBrowserMs, 120_000);
+    assert.equal(JSON.parse(calls.summaryInput).goal, task);
+    assert.equal(
+      JSON.parse(calls.summaryInput).plan_reason,
+      "افتح صفحة Example واقرأ محتواها.",
+    );
     assert.ok(result.steps.some((step) => step.includes("Playwright")));
+  });
+
+  it("supports a public IPv6-only domain", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const planned = await worker.fetch(
+      post(
+        "/api/plan",
+        { task: "افتح https://example.com واقرأ الصفحة" },
+        cookie,
+      ),
+      env,
+    );
+    const plan = await planned.json();
+    const response = await withDnsAnswers(
+      [],
+      () =>
+        worker.fetch(
+          post("/api/execute", { planToken: plan.planToken }, cookie),
+          env,
+        ),
+      ["2606:4700:4700::1111"],
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(calls.browser, 1);
+  });
+
+  it("returns extracted evidence when Workers AI cannot summarize it", async () => {
+    const { env } = createEnvironment({
+      summaryError: new Error("Workers AI unavailable"),
+    });
+    const cookie = await login(env);
+    const planned = await worker.fetch(
+      post(
+        "/api/plan",
+        { task: "افتح https://example.com واقرأ الصفحة" },
+        cookie,
+      ),
+      env,
+    );
+    const plan = await planned.json();
+    const response = await withDnsAnswers(["93.184.216.34"], () =>
+      worker.fetch(
+        post("/api/execute", { planToken: plan.planToken }, cookie),
+        env,
+      ),
+    );
+    const result = await response.json();
+
+    assert.equal(response.status, 503);
+    assert.equal(result.evidence.title, "Example Domain");
+    assert.match(result.evidence.excerpt, /This domain is for illustrative/);
+    assert.equal(result.steps.length, 3);
   });
 
   it("closes a failed browser session and keeps its full safety reservation", async () => {
@@ -434,12 +555,14 @@ describe("Ccelia read-only agent Worker", () => {
   });
 
   it("fails closed on private, mixed, or unavailable DNS answers", async () => {
-    for (const [addresses, ipv6Addresses] of [
-      [["10.0.0.8"], []],
-      [["93.184.216.34", "169.254.169.254"], []],
-      [["93.184.216.34"], ["fd00::1"]],
-      [["93.184.216.34"], ["2001:db8::1"]],
-      [null, []],
+    for (const [addresses, ipv6Addresses, status, expectedCode] of [
+      [["10.0.0.8"], [], 0, "non_public"],
+      [["93.184.216.34", "169.254.169.254"], [], 0, "non_public"],
+      [["93.184.216.34"], ["fd00::1"], 0, "non_public"],
+      [["93.184.216.34"], ["2001:db8::1"], 0, "non_public"],
+      [[], [], 0, "no_addresses"],
+      [[], [], 3, "not_found"],
+      [null, [], 0, "lookup_failed"],
     ]) {
       const { env, calls, state } = createEnvironment();
       const cookie = await login(env);
@@ -460,8 +583,11 @@ describe("Ccelia read-only agent Worker", () => {
             env,
           ),
         ipv6Addresses,
+        status,
       );
+      const result = await response.json();
       assert.equal(response.status, 400);
+      assert.equal(result.code, expectedCode);
       assert.equal(calls.browser, 0);
       assert.equal(
         (await state.storage.get("daily_usage")).browserRuns || 0,

@@ -27,6 +27,6 @@ npm audit --audit-level=high
 
 The Node built-in test suite exercises request contracts using stubbed AI, budget, and Playwright browser sessions. These tests do not prove live service access. `npm run build` asks Wrangler to bundle the Worker without deploying it.
 
-## Codespaces
+## Development Container
 
-The `.devcontainer/` configuration installs dependencies and starts Wrangler. A devcontainer file is provided, but no Codespace was created and no current account quota was visible during setup.
+No `.devcontainer/` configuration is included. Use the Node/npm setup above; Docker is optional and is not required for Worker unit tests.

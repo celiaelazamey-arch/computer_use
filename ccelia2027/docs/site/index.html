@@ -86,11 +86,14 @@
       <form id="login-form" class="dialog">
         <span class="eyebrow">Manus Mini</span>
         <h2>مساحة خاصة</h2>
-        <p>أدخل كلمة مرور الوصول التي أعدّها مالك الخدمة.</p>
+        <p>
+          أدخل كلمة مرور الوصول التي أعدّها مالك الخدمة (16 حرفًا على الأقل).
+        </p>
         <input
           id="password"
           type="password"
           autocomplete="current-password"
+          minlength="16"
           maxlength="512"
           required
         />
@@ -184,6 +187,7 @@
           );
           card.append(el("div", "content", message.content || "جارٍ العمل..."));
           if (message.plan) {
+            const canExecute = activeTokens.has(message.id);
             const plan = el("section", "plan");
             plan.append(el("h3", "", "خطة مقترحة للمراجعة"));
             plan.append(el("p", "", message.plan.analysis));
@@ -206,7 +210,7 @@
             );
             const row = el("div", "action-row");
             let approved = false;
-            if (message.plan.requiresConfirmation) {
+            if (canExecute && message.plan.requiresConfirmation) {
               const label = el("label", "confirm-line");
               const checkbox = document.createElement("input");
               checkbox.type = "checkbox";
@@ -227,20 +231,22 @@
             const button = el(
               "button",
               "primary",
-              activeTokens.has(message.id)
+              canExecute
                 ? "راجع ثم نفّذ القراءة"
                 : "انتهت صلاحية الخطة؛ أنشئ خطة جديدة",
             );
             button.type = "button";
             button.disabled =
-              !activeTokens.has(message.id) ||
               busy ||
-              (message.plan.requiresConfirmation && !approved);
-            button.addEventListener("click", () =>
-              runPlan(message.id, button, approved),
-            );
-            row.append(button);
-            plan.append(row);
+              (canExecute && message.plan.requiresConfirmation && !approved);
+            button.addEventListener("click", () => {
+              if (canExecute) runPlan(message.id, button, approved);
+              else refreshPlan(message.id, button);
+            });
+            if (!message.result || message.result.error) {
+              row.append(button);
+              plan.append(row);
+            }
             card.append(plan);
           }
           if (message.result) {
@@ -302,11 +308,26 @@
         const result = await response.json().catch(() => ({}));
         if (response.status === 401)
           document.querySelector("#login-layer").hidden = false;
-        if (!response.ok)
-          throw new Error(
+        if (!response.ok) {
+          const error = new Error(
             result.error || `تعذر إكمال الطلب (${response.status}).`,
           );
+          error.status = response.status;
+          error.data = result;
+          throw error;
+        }
         return result;
+      }
+      function originalTask(message) {
+        if (typeof message.task === "string" && message.task.trim())
+          return message.task;
+        const index = messages.findIndex((item) => item.id === message.id);
+        return (
+          messages
+            .slice(0, index)
+            .reverse()
+            .find((item) => item.role === "user")?.content || ""
+        );
       }
       async function makePlan(value) {
         if (busy) return;
@@ -317,6 +338,7 @@
           id: crypto.randomUUID(),
           role: "assistant",
           content: "",
+          task,
         };
         messages.push(assistant);
         taskBox.value = "";
@@ -342,6 +364,39 @@
           render();
         }
       }
+      async function refreshPlan(id, button) {
+        const message = messages.find((item) => item.id === id);
+        const task = message && originalTask(message);
+        if (!task || busy) return;
+        activeTokens.delete(id);
+        setBusy(true);
+        button.disabled = true;
+        message.content =
+          "يجري إنشاء خطة جديدة للطلب الأصلي. راجعها قبل التنفيذ.";
+        message.error = false;
+        render();
+        controller = new AbortController();
+        try {
+          const data = await requestJson(
+            "/api/plan",
+            { task },
+            controller.signal,
+          );
+          message.task = task;
+          message.plan = data.plan;
+          message.content =
+            "راجع الخطة الجديدة أدناه. لن يبدأ المتصفح تلقائيًا.";
+          activeTokens.set(id, data.planToken);
+          document.querySelector("#model").textContent = data.model;
+        } catch (error) {
+          message.content = error.message || "تعذر إنشاء خطة جديدة.";
+          message.error = true;
+        } finally {
+          controller = null;
+          setBusy(false, Boolean(message.error));
+          render();
+        }
+      }
       async function runPlan(id, button, confirmed) {
         const token = activeTokens.get(id);
         if (!token || busy) return;
@@ -364,8 +419,11 @@
             result.model || "Workers AI";
         } catch (error) {
           message.result = {
+            ...(error.data && typeof error.data === "object" ? error.data : {}),
             error: error.message || "تعذر تنفيذ المهمة بأمان.",
           };
+          if (error.status === 400 && !error.data?.code)
+            activeTokens.delete(id);
         } finally {
           controller = null;
           setBusy(false, Boolean(message.result?.error));

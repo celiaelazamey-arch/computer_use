@@ -63,12 +63,12 @@ jobs:
             try {
               const result = JSON.parse(fs.readFileSync(0, "utf8"));
               const content = result.choices?.[0]?.message?.content;
-              if (typeof content !== "string" || !content.trim()) {
-                throw new Error("missing content");
+              if (typeof content !== "string" || content.trim() !== "NIM_OK") {
+                throw new Error("unexpected content");
               }
-              console.log("NVIDIA NIM smoke test passed; response content was not logged.");
+              console.log("NVIDIA NIM smoke test returned the expected sentinel; response content was not logged.");
             } catch {
-              console.error("NVIDIA NIM returned an invalid or empty chat response.");
+              console.error("NVIDIA NIM returned an unexpected response.");
               process.exitCode = 1;
             }
           ' < "$response_file"

@@ -38,8 +38,20 @@ jobs:
           [[ "$CF_FREE_TIER_VARIABLE" == "true" ]] || { echo "::error::Set repository variable CLOUDFLARE_FREE_TIER_VERIFIED=true only after confirming no billing."; failures=1; }
           [[ -n "$CF_API_TOKEN" ]] || { echo "::error::Missing repository secret CLOUDFLARE_API_TOKEN."; failures=1; }
           [[ -n "$CF_ACCOUNT_ID" ]] || { echo "::error::Missing repository secret CLOUDFLARE_ACCOUNT_ID."; failures=1; }
-          [[ -n "$APP_ACCESS_PASSWORD" ]] || { echo "::error::Missing repository secret APP_ACCESS_PASSWORD."; failures=1; }
-          [[ ${#SESSION_SECRET} -ge 32 ]] || { echo "::error::SESSION_SECRET must contain at least 32 characters."; failures=1; }
+          if ! node --input-type=commonjs -e '
+            const password = process.env.APP_ACCESS_PASSWORD || "";
+            const session = process.env.SESSION_SECRET || "";
+            let failed = false;
+            if (password.length < 16) {
+              console.error("::error::APP_ACCESS_PASSWORD must contain at least 16 characters.");
+              failed = true;
+            }
+            if (session.length < 32) {
+              console.error("::error::SESSION_SECRET must contain at least 32 characters.");
+              failed = true;
+            }
+            if (failed) process.exitCode = 1;
+          '; then failures=1; fi
           exit "$failures"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,6 +68,13 @@ jobs:
 
       - name: Run Worker tests
         run: npm test
+        working-directory: ccelia2027
+
+      - name: Check formatting and dependency advisories
+        run: |
+          npm run format:check
+          npm exec -- prettier --check ../.github/workflows/*.yml ../.github/dependabot.yml ../CCELIA2027-DEPLOYMENT.md
+          npm audit --audit-level=high
         working-directory: ccelia2027
 
       - name: Lint and build Worker
