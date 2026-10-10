@@ -17,7 +17,7 @@ Two workflows can deploy:
 
 Configure these as GitHub Actions repository secrets; do not put values in source, issues, or chat:
 
-- `CLOUDFLARE_API_TOKEN` with only the permissions needed to deploy the Worker and set its secrets.
+- `CLOUDFLARE_API_TOKEN` authorized for the same account as `CLOUDFLARE_ACCOUNT_ID`. Cloudflare requires Workers product-level `Admin` to create a new Worker with Wrangler; an existing Worker can be deployed and have secrets managed with `Editor` scoped to that Worker. For least privilege, create the empty Worker in the dashboard first, then use a token scoped as `Editor` to that Worker. Wrangler reads the Worker's existing secret names during deployment; see [Workers roles](https://developers.cloudflare.com/workers/authorization/workers/) and [secret API permissions](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/subresources/secrets/methods/list/).
 - `CLOUDFLARE_ACCOUNT_ID`.
 - `APP_ACCESS_PASSWORD` (a unique, strong shared access password).
 - `SESSION_SECRET` (random, at least 32 characters).
