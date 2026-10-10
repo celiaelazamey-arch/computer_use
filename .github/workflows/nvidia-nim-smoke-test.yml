@@ -1,0 +1,74 @@
+name: NVIDIA NIM Smoke Test (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_nvidia_test:
+        description: "Send one synthetic test prompt to NVIDIA; this does not deploy the Worker."
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    if: github.ref == 'refs/heads/main'
+    name: Call NVIDIA NIM once
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Confirm the non-production test
+        env:
+          CONFIRM_NVIDIA_TEST: ${{ inputs.confirm_nvidia_test }}
+        run: |
+          if [[ "$CONFIRM_NVIDIA_TEST" != "true" ]]; then
+            echo "::error::Confirm that this sends one synthetic prompt to NVIDIA and does not deploy the Worker."
+            exit 1
+          fi
+
+      - name: Check the repository secret is configured
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: |
+          if [[ -z "$NVIDIA_API_KEY" ]]; then
+            echo "::error::Missing repository secret NVIDIA_API_KEY."
+            exit 1
+          fi
+          echo "NVIDIA_API_KEY is available."
+
+      - name: Send one small synthetic request
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: |
+          set +x
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          status="$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            --max-time 45 \
+            --request POST \
+            --url https://integrate.api.nvidia.com/v1/chat/completions \
+            --header "Authorization: Bearer ${NVIDIA_API_KEY}" \
+            --header "Content-Type: application/json" \
+            --data '{"model":"meta/llama-3.3-70b-instruct","messages":[{"role":"user","content":"Reply with exactly NIM_OK."}],"max_tokens":8,"temperature":0,"stream":false}')"
+          if [[ "$status" != "200" ]]; then
+            echo "::error::NVIDIA NIM returned HTTP ${status:-no response}; response body withheld."
+            exit 1
+          fi
+          node --input-type=commonjs -e '
+            const fs = require("node:fs");
+            try {
+              const result = JSON.parse(fs.readFileSync(0, "utf8"));
+              const content = result.choices?.[0]?.message?.content;
+              if (typeof content !== "string" || !content.trim()) {
+                throw new Error("missing content");
+              }
+              console.log("NVIDIA NIM smoke test passed; response content was not logged.");
+            } catch {
+              console.error("NVIDIA NIM returned an invalid or empty chat response.");
+              process.exitCode = 1;
+            }
+          ' < "$response_file"
