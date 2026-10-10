@@ -3,39 +3,188 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#101218" />
+    <meta name="theme-color" content="#f4f3ed" />
     <meta
       name="description"
-      content="Manus Mini: مساعد عربي يخطط وينفذ قراءة عامة للويب في متصفح سحابي."
+      content="Cela.sh: مساحة عربية لقراءة صفحات الويب العامة بأمان."
     />
-    <title>Manus Mini | وكيل ويب آمن</title>
-    <link rel="stylesheet" href="/app.css" />
+    <title>Cela.sh | مساحة القراءة الآمنة</title>
+    <link rel="stylesheet" href="/ccelia.css" />
   </head>
   <body>
-    <div class="shell">
-      <header class="topbar">
-        <div class="brand">
-          <span class="mark">M</span
-          ><span>manus mini<br /><small>مساعدك للويب العام</small></span>
-        </div>
-        <div class="top-right">
-          <span id="service-pill" class="pill offline">جارٍ فحص الخدمة</span
-          ><button id="logout" class="quiet" hidden>خروج آمن</button>
-        </div>
-      </header>
-      <main class="layout">
-        <section class="workspace" aria-label="المحادثة">
-          <div class="intro">
-            <div class="eyebrow">خطط. راجع. نفّذ.</div>
-            <h1>ابحث في الويب،<br />بدليل واضح.</h1>
-            <p>
-              أنشئ خطة أولًا، راجعها، ثم اقرأ صفحة عامة بجلسة Playwright قصيرة.
-              لا تسجيل دخول للمواقع أو تفاعل معها أو إرسال أو حذف أو تعديل. لا
-              نشغّل JavaScript داخل الصفحات؛ قد لا يظهر المحتوى الذي يعتمد عليه.
-            </p>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="التنقل">
+        <a class="brand" href="/" aria-label="Cela.sh، الصفحة الرئيسية">
+          <span class="brand-mark" aria-hidden="true"><span>C</span></span>
+          <span class="brand-copy">
+            <strong>Cela.sh</strong>
+            <small>مساحة القراءة الآمنة</small>
+          </span>
+        </a>
+        <nav class="side-nav" aria-label="القائمة الرئيسية">
+          <button class="nav-item active" id="new-task-nav" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>مهمة جديدة</span>
+          </button>
+          <button class="nav-item" id="history-nav" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M12 7v5l3 2" />
+            </svg>
+            <span>سجل القراءة</span>
+          </button>
+          <button class="nav-item" id="safety-nav" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="m12 3 7 3v5c0 4.5-2.7 7.9-7 10-4.3-2.1-7-5.5-7-10V6l7-3Z"
+              />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+            <span>سياسة الأمان</span>
+          </button>
+        </nav>
+        <section class="sidebar-section project-section" aria-label="المشروع">
+          <div class="section-label">مساحة العمل</div>
+          <div class="project-card">
+            <span class="project-mark" aria-hidden="true">C</span>
+            <span class="project-copy">
+              <strong>Cela.sh</strong>
+              <small>استكشاف الويب العام</small>
+            </span>
+            <span class="project-dot" aria-label="نشط"></span>
           </div>
+        </section>
+        <section
+          id="recent-section"
+          class="sidebar-section recent-section"
+          aria-label="المهام الأخيرة"
+        >
+          <div class="section-label">
+            <span>المهام الأخيرة</span>
+            <span id="history-count" class="section-count">0</span>
+          </div>
+          <div id="history-list" class="history-list"></div>
+          <p id="history-empty" class="history-empty">ستظهر مهامك هنا</p>
+        </section>
+        <div class="sidebar-footer">
+          <span class="user-avatar" aria-hidden="true">C</span>
+          <span class="user-copy">
+            <strong>Celia Elazamey</strong>
+            <small>مساحة شخصية</small>
+          </span>
+          <span class="user-presence" aria-label="متصل"></span>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div class="model-summary">
+            <span class="model-mark" aria-hidden="true">C</span>
+            <span class="model-copy">
+              <strong>Cela.sh Reader</strong>
+              <small id="model">جارٍ فحص النموذج</small>
+            </span>
+            <span class="model-chevron" aria-hidden="true">⌄</span>
+          </div>
+          <div class="topbar-actions">
+            <span class="read-mode">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="m12 3 7 3v5c0 4.5-2.7 7.9-7 10-4.3-2.1-7-5.5-7-10V6l7-3Z"
+                />
+              </svg>
+              قراءة عامة فقط
+            </span>
+            <span id="service-pill" class="service-pill offline"
+              >جارٍ فحص الخدمة</span
+            >
+            <button id="logout" class="logout-button" hidden>خروج آمن</button>
+          </div>
+        </header>
+        <p id="config" class="config-notice" hidden></p>
+
+        <section class="workspace" aria-label="المحادثة">
+          <div id="empty-state" class="empty-state">
+            <div class="hero">
+              <div class="hero-orbit" aria-hidden="true">
+                <span>C</span>
+              </div>
+              <div class="hero-kicker">مساحة Cela.sh</div>
+              <h1>ما الذي تريد قراءته اليوم؟</h1>
+              <p>
+                افتح صفحة عامة أو ابحث عن موضوع. راجع الخطة قبل التشغيل، وستبقى
+                كل خطوة للقراءة فقط.
+              </p>
+            </div>
+            <div class="feature-grid" aria-label="طرق البدء">
+              <button
+                class="feature-card"
+                data-task="افتح https://example.com واقرأ عنوان الصفحة"
+                type="button"
+              >
+                <span class="feature-icon link-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="m10 13 4-4" />
+                    <path
+                      d="M8.5 15.5 7 17a4 4 0 0 1-5.7-5.7l4-4A4 4 0 0 1 11 7"
+                    />
+                    <path
+                      d="m15.5 8.5 1.5-1.5a4 4 0 0 1 5.7 5.7l-4 4A4 4 0 0 1 13 17"
+                    />
+                  </svg>
+                </span>
+                <span class="feature-copy">
+                  <strong>قراءة رابط مباشر</strong>
+                  <small>عنوان الصفحة ونصها الظاهر</small>
+                </span>
+                <span class="feature-arrow" aria-hidden="true">↗</span>
+              </button>
+              <button
+                class="feature-card"
+                data-task="ابحث عن وثائق Cloudflare Workers AI"
+                type="button"
+              >
+                <span class="feature-icon search-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="10.8" cy="10.8" r="6.8" />
+                    <path d="m16 16 5 5" />
+                  </svg>
+                </span>
+                <span class="feature-copy">
+                  <strong>بحث في موضوع</strong>
+                  <small>استكشاف صفحات عامة ومراجعة الخطة</small>
+                </span>
+                <span class="feature-arrow" aria-hidden="true">↗</span>
+              </button>
+              <section id="safety-card" class="feature-card safety-card">
+                <span class="feature-icon safety-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="m12 3 7 3v5c0 4.5-2.7 7.9-7 10-4.3-2.1-7-5.5-7-10V6l7-3Z"
+                    />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                </span>
+                <span class="feature-copy">
+                  <strong>حدود واضحة</strong>
+                  <small
+                    >لا تسجيل دخول أو نقر أو إرسال أو تعديل. تتوقف المهمة عند حد
+                    الاستخدام.</small
+                  >
+                </span>
+                <span class="safety-caption">خصوصية أولًا</span>
+              </section>
+            </div>
+          </div>
+
           <div id="thread" class="thread" aria-live="polite"></div>
+
           <form id="composer" class="composer">
+            <label class="composer-label" for="task"
+              >ما المهمة التي تريد تنفيذها؟</label
+            >
             <textarea
               id="task"
               maxlength="2000"
@@ -44,56 +193,34 @@
               required
             ></textarea>
             <div class="composer-bottom">
-              <small
-                >سجل المحادثة يُحفظ في هذا المتصفح فقط. لا تكتب كلمات مرور أو
-                أسرارًا، ولا تفتح رابطًا ينفذ إجراءً بمجرد تحميله.</small
-              ><button id="send" class="send" aria-label="أنشئ خطة">↑</button>
+              <div class="composer-hints">
+                <span class="hint-chip">HTTPS فقط</span>
+                <span class="hint-chip">قراءة بلا تفاعل</span>
+                <small
+                  >لا تكتب كلمات مرور أو أسرارًا، ولا تفتح رابطًا يُحدث تغييرًا
+                  عند تحميله.</small
+                >
+              </div>
+              <button id="send" class="send" aria-label="أنشئ خطة">↑</button>
             </div>
           </form>
+          <p id="safety-note" class="workspace-footer">
+            تُحفظ المحادثة في هذا المتصفح فقط. لا ينفّذ Cela.sh تسجيل الدخول
+            للمواقع أو أي إجراء يغيّر بياناتها.
+          </p>
         </section>
-        <aside class="side" aria-label="حالة التنفيذ">
-          <section class="card">
-            <h2>خدمات التشغيل</h2>
-            <p>النموذج: <b id="model">جارٍ الفحص</b></p>
-            <p>المتصفح: <b>Cloudflare Browser Run · Playwright</b></p>
-            <p>النمط: <b>قراءة فقط</b></p>
-            <p id="config" class="notice" hidden></p>
-          </section>
-          <section class="card">
-            <h2>كيف تعمل</h2>
-            <p>١. النموذج ينشئ خطة منظمة.</p>
-            <p>٢. راجع الموقع والهدف قبل التشغيل.</p>
-            <p>٣. المتصفح السحابي يفتح الصفحة ويستخرج النص.</p>
-            <p>٤. النموذج يلخص النص الذي قُرئ بالفعل.</p>
-          </section>
-          <section class="card cost">
-            <h2>حماية الحصة والتكلفة</h2>
-            <p>
-              حجز داخلي محافظ: حتى ٥ محاولات متصفح في اليوم، دقيقتان محجوزتان
-              لكل محاولة، و٢٨ استدعاء AI.
-            </p>
-            <p>لا يوجد مزود احتياطي مدفوع. عند الحد أو الخطأ، تتوقف المهمة.</p>
-            <p>هذه الحدود لا تستبدل ضبط حساب Cloudflare على الخطة المجانية.</p>
-          </section>
-        </aside>
       </main>
-      <footer>
-        لا يُنفّذ التطبيق تسجيل الدخول للمواقع أو إرسال النماذج أو أي تغيير
-        خارجي.
-      </footer>
     </div>
     <div id="login-layer" class="overlay" hidden>
       <form id="login-form" class="dialog">
-        <span class="eyebrow">Manus Mini</span>
-        <h2>مساحة خاصة</h2>
-        <p>
-          أدخل كلمة مرور الوصول التي أعدّها مالك الخدمة (16 حرفًا على الأقل).
-        </p>
+        <span class="login-mark" aria-hidden="true">C</span>
+        <span class="eyebrow">Cela.sh</span>
+        <h2>أهلًا بك في مساحتك</h2>
+        <p>أدخل كلمة مرور الوصول التي أعدّها مالك الخدمة.</p>
         <input
           id="password"
           type="password"
           autocomplete="current-password"
-          minlength="16"
           maxlength="512"
           required
         />
@@ -106,13 +233,20 @@
       const form = document.querySelector("#composer");
       const taskBox = document.querySelector("#task");
       const sendButton = document.querySelector("#send");
+      const emptyState = document.querySelector("#empty-state");
+      const historyList = document.querySelector("#history-list");
       const activeTokens = new Map();
-      const STORAGE_KEY = "manus-mini-browser-history-v1";
+      const STORAGE_KEY = "cela-sh-browser-history-v1";
+      const LEGACY_STORAGE_KEY = "manus-mini-browser-history-v1";
       let busy = false;
       let controller;
       let messages = [];
       try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        const currentHistory = localStorage.getItem(STORAGE_KEY);
+        const legacyHistory = currentHistory
+          ? null
+          : localStorage.getItem(LEGACY_STORAGE_KEY);
+        const saved = JSON.parse(currentHistory || legacyHistory || "[]");
         if (Array.isArray(saved))
           messages = saved
             .filter(
@@ -122,6 +256,8 @@
                 typeof item.content === "string",
             )
             .slice(-40);
+        if (!currentHistory && legacyHistory)
+          localStorage.setItem(STORAGE_KEY, legacyHistory);
       } catch {
         messages = [];
       }
@@ -140,6 +276,30 @@
           );
         } catch {}
       }
+      function renderHistory() {
+        const recent = messages
+          .filter((item) => item.role === "user")
+          .slice(-6)
+          .reverse();
+        historyList.replaceChildren();
+        document.querySelector("#history-count").textContent = String(
+          recent.length,
+        ).padStart(2, "0");
+        document.querySelector("#history-empty").hidden = recent.length > 0;
+        for (const item of recent) {
+          const button = el("button", "history-item");
+          button.type = "button";
+          button.title = item.content;
+          const dot = el("span", "history-dot");
+          dot.setAttribute("aria-hidden", "true");
+          button.append(dot, el("span", "history-text", item.content));
+          button.addEventListener("click", () => {
+            taskBox.value = item.content;
+            taskBox.focus();
+          });
+          historyList.append(button);
+        }
+      }
       function setBusy(value, stopped = false) {
         busy = value;
         sendButton.disabled = value;
@@ -150,44 +310,19 @@
             ? "توقفت المهمة"
             : "الخدمة جاهزة";
         document.querySelector("#service-pill").className =
-          `pill${stopped ? " offline" : ""}`;
+          `service-pill${stopped ? " offline" : ""}`;
       }
       function render() {
         thread.replaceChildren();
-        if (!messages.length) {
-          const welcome = el("div", "welcome");
-          welcome.append(el("strong", "", "ابدأ بمهمة عامة منخفضة المخاطر"));
-          welcome.append(
-            el(
-              "p",
-              "",
-              "مثال: افتح https://developers.cloudflare.com/workers-ai/platform/pricing/ واستخرج حد الاستخدام المجاني.",
-            ),
-          );
-          const samples = el("div", "samples");
-          for (const value of [
-            "افتح https://example.com واقرأ عنوان الصفحة",
-            "ابحث عن أحدث وثائق Cloudflare Workers AI",
-          ]) {
-            const button = el("button", "", value);
-            button.type = "button";
-            button.addEventListener("click", () => {
-              taskBox.value = value;
-              taskBox.focus();
-            });
-            samples.append(button);
-          }
-          welcome.append(samples);
-          thread.append(welcome);
-        }
+        emptyState.hidden = messages.length > 0;
+        renderHistory();
         for (const message of messages) {
           const card = el("article", `message ${message.role}`);
           card.append(
-            el("div", "label", message.role === "user" ? "أنت" : "Manus Mini"),
+            el("div", "label", message.role === "user" ? "أنت" : "Cela.sh"),
           );
           card.append(el("div", "content", message.content || "جارٍ العمل..."));
           if (message.plan) {
-            const canExecute = activeTokens.has(message.id);
             const plan = el("section", "plan");
             plan.append(el("h3", "", "خطة مقترحة للمراجعة"));
             plan.append(el("p", "", message.plan.analysis));
@@ -210,7 +345,7 @@
             );
             const row = el("div", "action-row");
             let approved = false;
-            if (canExecute && message.plan.requiresConfirmation) {
+            if (message.plan.requiresConfirmation) {
               const label = el("label", "confirm-line");
               const checkbox = document.createElement("input");
               checkbox.type = "checkbox";
@@ -231,22 +366,20 @@
             const button = el(
               "button",
               "primary",
-              canExecute
+              activeTokens.has(message.id)
                 ? "راجع ثم نفّذ القراءة"
                 : "انتهت صلاحية الخطة؛ أنشئ خطة جديدة",
             );
             button.type = "button";
             button.disabled =
+              !activeTokens.has(message.id) ||
               busy ||
-              (canExecute && message.plan.requiresConfirmation && !approved);
-            button.addEventListener("click", () => {
-              if (canExecute) runPlan(message.id, button, approved);
-              else refreshPlan(message.id, button);
-            });
-            if (!message.result || message.result.error) {
-              row.append(button);
-              plan.append(row);
-            }
+              (message.plan.requiresConfirmation && !approved);
+            button.addEventListener("click", () =>
+              runPlan(message.id, button, approved),
+            );
+            row.append(button);
+            plan.append(row);
             card.append(plan);
           }
           if (message.result) {
@@ -297,6 +430,11 @@
         thread.scrollTop = thread.scrollHeight;
         persist();
       }
+      function setActiveNav(id) {
+        document.querySelectorAll(".nav-item").forEach((item) => {
+          item.classList.toggle("active", item.id === id);
+        });
+      }
       async function requestJson(path, payload, signal) {
         const response = await fetch(path, {
           method: "POST",
@@ -308,26 +446,11 @@
         const result = await response.json().catch(() => ({}));
         if (response.status === 401)
           document.querySelector("#login-layer").hidden = false;
-        if (!response.ok) {
-          const error = new Error(
+        if (!response.ok)
+          throw new Error(
             result.error || `تعذر إكمال الطلب (${response.status}).`,
           );
-          error.status = response.status;
-          error.data = result;
-          throw error;
-        }
         return result;
-      }
-      function originalTask(message) {
-        if (typeof message.task === "string" && message.task.trim())
-          return message.task;
-        const index = messages.findIndex((item) => item.id === message.id);
-        return (
-          messages
-            .slice(0, index)
-            .reverse()
-            .find((item) => item.role === "user")?.content || ""
-        );
       }
       async function makePlan(value) {
         if (busy) return;
@@ -338,7 +461,6 @@
           id: crypto.randomUUID(),
           role: "assistant",
           content: "",
-          task,
         };
         messages.push(assistant);
         taskBox.value = "";
@@ -354,46 +476,17 @@
           assistant.content = "راجع الخطة أدناه. لن يبدأ المتصفح تلقائيًا.";
           assistant.plan = data.plan;
           activeTokens.set(assistant.id, data.planToken);
-          document.querySelector("#model").textContent = data.model;
+          document.querySelector("#model").textContent =
+            data.planner ||
+            (data.provider === "nvidia"
+              ? `NVIDIA NIM · ${data.model}`
+              : data.model || "غير متاح");
         } catch (error) {
           assistant.content = error.message || "تعذر إنشاء الخطة.";
           assistant.error = true;
         } finally {
           controller = null;
           setBusy(false, Boolean(assistant.error));
-          render();
-        }
-      }
-      async function refreshPlan(id, button) {
-        const message = messages.find((item) => item.id === id);
-        const task = message && originalTask(message);
-        if (!task || busy) return;
-        activeTokens.delete(id);
-        setBusy(true);
-        button.disabled = true;
-        message.content =
-          "يجري إنشاء خطة جديدة للطلب الأصلي. راجعها قبل التنفيذ.";
-        message.error = false;
-        render();
-        controller = new AbortController();
-        try {
-          const data = await requestJson(
-            "/api/plan",
-            { task },
-            controller.signal,
-          );
-          message.task = task;
-          message.plan = data.plan;
-          message.content =
-            "راجع الخطة الجديدة أدناه. لن يبدأ المتصفح تلقائيًا.";
-          activeTokens.set(id, data.planToken);
-          document.querySelector("#model").textContent = data.model;
-        } catch (error) {
-          message.content = error.message || "تعذر إنشاء خطة جديدة.";
-          message.error = true;
-        } finally {
-          controller = null;
-          setBusy(false, Boolean(message.error));
           render();
         }
       }
@@ -416,20 +509,44 @@
           message.result = result;
           activeTokens.delete(id);
           document.querySelector("#model").textContent =
-            result.model || "Workers AI";
+            result.provider === "nvidia"
+              ? `NVIDIA NIM · ${result.model}`
+              : result.model || "Workers AI";
         } catch (error) {
           message.result = {
-            ...(error.data && typeof error.data === "object" ? error.data : {}),
             error: error.message || "تعذر تنفيذ المهمة بأمان.",
           };
-          if (error.status === 400 && !error.data?.code)
-            activeTokens.delete(id);
         } finally {
           controller = null;
           setBusy(false, Boolean(message.result?.error));
           render();
         }
       }
+      document.querySelector("#new-task-nav").addEventListener("click", () => {
+        setActiveNav("new-task-nav");
+        document
+          .querySelector("#composer")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+        taskBox.focus();
+      });
+      document.querySelector("#history-nav").addEventListener("click", () => {
+        setActiveNav("history-nav");
+        document
+          .querySelector("#recent-section")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      document.querySelector("#safety-nav").addEventListener("click", () => {
+        setActiveNav("safety-nav");
+        document
+          .querySelector("#safety-note")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      document.querySelectorAll("[data-task]").forEach((button) => {
+        button.addEventListener("click", () => {
+          taskBox.value = button.dataset.task;
+          taskBox.focus();
+        });
+      });
       form.addEventListener("submit", (event) => {
         event.preventDefault();
         makePlan(taskBox.value);
@@ -465,12 +582,14 @@
             (response) => response.json(),
           );
           document.querySelector("#model").textContent =
-            status.model || "غير متاح";
+            status.provider === "nvidia"
+              ? `NVIDIA NIM · ${status.model}`
+              : status.model || "غير متاح";
           const pill = document.querySelector("#service-pill");
           pill.textContent = status.configured
             ? "الخدمات مهيأة"
             : "الإعداد ناقص";
-          pill.className = `pill${status.configured ? "" : " offline"}`;
+          pill.className = `service-pill${status.configured ? "" : " offline"}`;
           if (!status.configured) {
             const notice = document.querySelector("#config");
             notice.hidden = false;
