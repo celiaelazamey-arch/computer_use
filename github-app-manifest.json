@@ -1,0 +1,28 @@
+{
+  "name": "Autonomous-AI-Agent-2026",
+  "url": "https://github.com",
+  "hook_attributes": {
+    "url": "https://your-domain.com/api/v1/webhook",
+    "active": true
+  },
+  "redirect_url": "https://your-domain.com/setup/callback",
+  "public": false,
+  "default_permissions": {
+    "contents": "write",
+    "issues": "write",
+    "pull_requests": "write",
+    "metadata": "read",
+    "checks": "write",
+    "actions": "read",
+    "workflows": "write"
+  },
+  "default_events": [
+    "pull_request",
+    "pull_request_review_comment",
+    "issues",
+    "issue_comment",
+    "check_run",
+    "push"
+  ],
+  "description": "Production-grade Autonomous AI Agent (2026) for automated code reviews, intelligent issue resolution, and interactive repository management."
+}
