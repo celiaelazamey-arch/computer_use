@@ -1,0 +1,13 @@
+# Security headers for every static asset request served by the Worker.
+# The UI loads no third-party script, style, font, image, or XHR target: all
+# fetches are same-origin /api/* paths and all icons are local /icons/*.svg.
+# The page script is an external module (/app.js), so no 'unsafe-inline' is
+# needed and inline script injection is blocked outright.
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin

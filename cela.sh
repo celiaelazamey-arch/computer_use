@@ -20,9 +20,14 @@ prettier_check_root_docs() {
     npm exec -- prettier --check \
       ../README.md \
       ../CHANGELOG.md \
+      ../CONTRIBUTING.md \
+      ../SECURITY.md \
       ../docs/*.md \
       ../.github/dependabot.yml \
       ../.github/workflows/*.yml \
+      ../.github/PULL_REQUEST_TEMPLATE.md \
+      ../.github/ISSUE_TEMPLATE/*.yml \
+      ../.github/ISSUE_TEMPLATE/*.md \
       ../CCELIA2027-DEPLOYMENT.md
   )
 }

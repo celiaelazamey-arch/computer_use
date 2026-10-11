@@ -15,7 +15,7 @@ GitHub runs workflows only from the repository-root `.github/workflows/` directo
 - `deploy-ccelia2027.yml` — manual-only production deploy, restricted to `main`, with CI-style checks and explicit Free-tier attestations.
 - `nvidia-nim-smoke-test.yml` — optional manual test that sends one synthetic prompt to NVIDIA and verifies its exact sentinel response. It does not change or deploy the Worker.
 
-The similarly named files retained under `ccelia2027/.github/workflows/` are inactive templates in this monorepo. In particular, there is no automatic deploy on push.
+These are the only workflow files in the monorepo; this package keeps none of its own. In particular, there is no automatic deploy on push.
 
 ## Required Secrets
 
