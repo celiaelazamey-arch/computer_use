@@ -36,13 +36,14 @@ cela.sh/
 ├── .env.example              # مرجع أسماء متغيرات الإعداد
 ├── docker-compose.yml        # خدمات Ollama وQdrant المحليتان
 ├── src/cela_sh/
-│   ├── cli.py                # واجهة JSON ورموز الخروج
+│   ├── cli.py                # واجهة JSON ورموز الخروج في EXIT_CODES
 │   ├── settings.py           # تحقق إعدادات البيئة
 │   ├── factory.py            # تركيب Planner ومخزن الذاكرة
 │   ├── planner/              # Ollama، نماذج الخطة، والسياسة
-│   └── memory/               # العقد والمخازن وembeddings
-├── tests/                    # اختبارات offline وفحوص تكامل حية اختيارية
-└── docs/                     # البروتوكول والمعمارية والتشغيل
+│   └── memory/               # العقد والمخازن وembeddings وسجل الـ backends
+├── tests/                    # اختبارات offline، عقود مشتركة، وفحوص تكامل حية اختيارية
+├── tools/api_surface.py      # لقطة سطح العقد العام لكشف كسر التوافق
+└── docs/                     # البروتوكول والمعمارية والتوسعة والتشغيل
 ```
 
 تُثبت الحزمة بتخطيط `src`؛ لا تعتمد الاختبارات أو المستخدمون على تشغيلها من مجلد المصدر مباشرةً. `create_planner(settings)` هو composition root، ويمكن للمستدعي حقن `MemoryStore` بديل عند إنشاء `OllamaPlanner`.
@@ -50,11 +51,12 @@ cela.sh/
 ## وحدات النظام
 
 - `settings.py`: يقرأ متغيرات `CELA_*` ويضبط نماذج Ollama، المهلات، وذاكرة Qdrant المعطلة افتراضياً.
-- `factory.py`: يختار مخزن الذاكرة ويربطه بالمخطط ومزود embeddings.
+- `factory.py`: يسجّل المخازن المدمجة ويبني المخزن المفعّل عبر السجلّ، ثم يربطه بالمخطط ومزود embeddings.
 - `planner/client.py`: اتصال Ollama، الاسترجاع الاختياري، التحقق من المدخل والمخرج، وتطبيق السياسة.
 - `planner/models.py`: مخطط Pydantic صارم، أفعال محددة، حد أقصى للخطوات، وفرض أن `STOP` آخر خطوة.
 - `planner/policy.py`: تصنيف قواعدي مستقل عن النموذج؛ ليس مصنفاً شاملاً للمخاطر.
 - `memory/base.py`: عقد `MemoryStore` و`MemoryStoreError`.
+- `memory/registry.py`: سجلّ مخازن الذاكرة؛ مصدر الحقيقة لقيم `CELA_MEMORY_BACKEND` ونقطة الإضافة لأي مخزن جديد.
 - `memory/mock_store.py`: مخزن حتمي مؤقت للاختبارات.
 - `memory/embeddings.py` و`memory/qdrant_store.py`: embeddings محلية وREST لـ Qdrant، بلا `qdrant-client`.
 

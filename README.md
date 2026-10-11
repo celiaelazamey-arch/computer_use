@@ -71,27 +71,45 @@ print(plan.model_dump_json(indent=2))
 
 ## بنية المشروع
 
-- `cela.sh`: واجهة تشغيل موحدة للتثبيت والاختبار والخدمات والتخطيط.
+- `cela.sh`: واجهة تشغيل موحدة للتثبيت والاختبار والخدمات والتخطيط وبوابة `preflight`.
 - `src/cela_sh/settings.py`: إعدادات البيئة والتحقق منها.
 - `src/cela_sh/factory.py`: تركيب الخدمات والمزودات دون ربط المستهلك بتفاصيل Qdrant.
 - `src/cela_sh/planner/`: مخططات البيانات، عميل Ollama، والسياسة المستقلة.
-- `src/cela_sh/memory/`: عقد الذاكرة، مخزن اختباري مؤقت، embeddings، ومحول Qdrant REST.
-- `tests/`: اختبارات offline؛ `integration_plan_probe.py` لفحص توليد الخطة الحي و`integration_live_probe.py` لفحص الذاكرة الحي الاختياري.
-- `docs/`: المعمارية والبروتوكول وقائمة تسليم التشغيل.
+- `src/cela_sh/memory/`: عقد الذاكرة، مخزن اختباري مؤقت، embeddings، محول Qdrant REST، و`registry.py` لتسجيل مخازن جديدة.
+- `tests/`: اختبارات offline، وعقود سلوكية مشتركة في `contract_memory_store.py`، وبدائل غير متصلة في `fakes.py`؛ `integration_plan_probe.py` لفحص توليد الخطة الحي و`integration_live_probe.py` لفحص الذاكرة الحي الاختياري.
+- `tools/api_surface.py`: يلتقط سطح العقد العام للمستودع في `tests/snapshots/api_surface.json` لكشف أي كسر توافق.
+- `docs/`: المعمارية والبروتوكول ودليل التوسعة وقائمة تسليم التشغيل.
 - `ccelia2027/`: تطبيق Worker مستقل داخل المستودع؛ استخدم [دليل تشغيله](ccelia2027/README.md) و[دليل النشر الموحد](CCELIA2027-DEPLOYMENT.md).
 - `.github/workflows/`: CI لكلا التطبيقين، CodeQL لـ JavaScript وPython، ونشر Worker يدوي فقط.
 
 ## الأوامر والفحوص
 
 ```bash
+bash ./cela.sh preflight
 bash ./cela.sh test
+bash ./cela.sh api-surface --check
 bash ./cela.sh check-all
 bash ./cela.sh probe
 bash ./cela.sh probe-memory
 bash ./cela.sh services-stop
 ```
 
+`preflight` هي البوابة التي تُشغَّل قبل الدفع: اختبارات Python، وفحص لقطة العقد العام، وبناء الحزمة، وفحوص Worker كاملة. لا تبدأ Docker ولا Ollama ولا تنشر شيئًا، وتُعلن ما تخطّته بدل النجاح الصامت.
+
 الاختبارات المعتادة لا تشغل خدمات ولا تتصل بالإنترنت. `probe` يتصل بـ Ollama الحقيقي ويولد خطة صالحة؛ لا يحتاج Qdrant. فحص الذاكرة منفصل: شغّل `bash ./cela.sh services-up-memory` ثم `bash ./cela.sh probe-memory`؛ ينشئ collection اختبارية مؤقتة ويتأكد من عزل الجلسات وحذفها. راجع `docs/phase-1-milestone.md` قبل تشغيل الفحوص الحية.
+
+## التوسعة دون كسر النظام
+
+التوسعة إضافة لا جراحة. مخازن الذاكرة تُسجَّل عبر `register_memory_backend` دون تعديل `factory.py` أو `settings.py`، وكل backend جديد يخضع لمجموعة العقود السلوكية نفسها في `tests/contract_memory_store.py` — بما فيها عزل الجلسات ونسخ النتائج.
+
+سطح العقد العام (الأسماء المصدَّرة، التواقيع، أعضاء `Action`، حقول النماذج، أعلام CLI، أكواد الخروج، ومسارات Worker) مُثبَّت في `tests/snapshots/api_surface.json`. أي حذف أو إعادة تسمية أو تغيير كود خروج يُفشل CI بدل أن يمر بصمت. بعد تغيير مقصود ومتوافق:
+
+```bash
+bash ./cela.sh api-surface --update
+git diff tests/snapshots/api_surface.json
+```
+
+الوصفات خطوة بخطوة — مخزن ذاكرة، مزوّد تخطيط، فعل جديد، قاعدة سياسة، علم CLI، مسار Worker، متغير إعداد، خدمة Compose — في [دليل التوسعة](docs/extension-guide.md).
 
 ## حدود الأمان والحالة
 
