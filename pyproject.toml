@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.4,<9"]
+dev = ["pytest>=7.4,<10"]
 
 [project.scripts]
 "cela.sh" = "cela_sh.__main__:main"
