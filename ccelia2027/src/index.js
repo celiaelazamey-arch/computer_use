@@ -2,6 +2,8 @@ const MODEL = "@cf/meta/llama-3.2-3b-instruct";
 const SESSION_COOKIE = "ccelia_session";
 const SESSION_SECONDS = 60 * 60 * 8;
 const PLAN_SECONDS = 60 * 5;
+// Keeps a used plan id a little past its token expiry, to cover clock skew.
+const PLAN_CONSUMED_GRACE_MS = 5_000;
 const MIN_APP_ACCESS_PASSWORD_LENGTH = 16;
 const MAX_TASK_LENGTH = 2_000;
 const PAGE_TEXT_LIMIT = 6_000;
@@ -23,6 +25,8 @@ const BROWSER_MIN_INTERVAL_MS = 20_000;
 // session cookie, and logout would not revoke it.
 const SESSION_TOKEN_TYPE = "session";
 const PLAN_TOKEN_TYPE = "plan";
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // Applied to every JSON response. Static assets get the equivalent, plus a
 // script/style policy, from docs/site/_headers.
@@ -210,6 +214,25 @@ async function allowLoginAttempt(env, request) {
     return (await env.LOGIN_LIMITER.limit({ key: rateKey(request) })).success;
   } catch {
     return false;
+  }
+}
+
+// Marks a plan token as used. Returns "consumed", "used" (409), or "unavailable".
+// Anything other than a clear success fails closed: the caller must not start a browser.
+async function consumePlan(env, plan) {
+  if (!env.DAILY_BUDGET) return "unavailable";
+  try {
+    const id = env.DAILY_BUDGET.idFromName("global");
+    const stub = env.DAILY_BUDGET.get(id);
+    const response = await stub.fetch("https://budget.internal/consume-plan", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jti: plan.jti, exp: plan.exp }),
+    });
+    if (response.status === 409) return "used";
+    return response.ok ? "consumed" : "unavailable";
+  } catch {
+    return "unavailable";
   }
 }
 
@@ -525,6 +548,8 @@ async function signedPlan(env, plan, task) {
     query: plan.query,
     reason: plan.reason,
     needsConfirmation: SENSITIVE_TERMS.test(policyText),
+    // One identity per issued token. A retry issues a new token and a new jti.
+    jti: crypto.randomUUID(),
   };
   const encoded = base64url(new TextEncoder().encode(JSON.stringify(payload)));
   return `${encoded}.${base64url(await signature(env.SESSION_SECRET, encoded))}`;
@@ -556,6 +581,9 @@ async function verifyPlanToken(env, token) {
     );
     // A session cookie is not a plan token, and a typeless token is rejected.
     if (value.typ !== PLAN_TOKEN_TYPE) return null;
+    // Tokens issued before the jti rule are refused, so each use can be recorded.
+    if (typeof value.jti !== "string" || !UUID_PATTERN.test(value.jti))
+      return null;
     if (
       !Number.isInteger(value.exp) ||
       value.exp <= Date.now() ||
@@ -820,6 +848,26 @@ async function executePlan(request, env, launchBrowser) {
       { error: "تتطلب هذه المهمة تأكيدًا صريحًا قبل قراءة الصفحة." },
       409,
     );
+  // Consume before DNS and browser reservation. A refused confirmation above
+  // does not consume the plan. Any failure after this point uses up the token,
+  // and the user must create a new plan.
+  const consumed = await consumePlan(env, plan);
+  if (consumed === "used")
+    return json(
+      {
+        error: "هذه الخطة استُخدمت بالفعل. أنشئ خطة جديدة.",
+        code: "plan_already_used",
+      },
+      409,
+    );
+  if (consumed !== "consumed")
+    return json(
+      {
+        error:
+          "تعذر تسجيل استخدام الخطة بأمان. لم يبدأ Browser Run؛ حاول مجددًا لاحقًا.",
+      },
+      503,
+    );
   const target =
     plan.action === "search" ? publicSearchUrl(plan.query) : plan.url;
   const dns = await resolvesToPublicAddress(target);
@@ -1065,10 +1113,39 @@ export class DailyBudget {
     this.state = state;
   }
 
+  // Records a plan token as used. Single-object serialization: this DO also owns
+  // the daily AI and browser budget, so every plan use waits behind those calls.
+  // That is a known architectural limit, documented in docs/free-tier.md.
+  consumePlan(body) {
+    if (
+      typeof body.jti !== "string" ||
+      !UUID_PATTERN.test(body.jti) ||
+      !Number.isSafeInteger(body.exp)
+    )
+      return json({ error: "Invalid plan" }, 400);
+    return this.state.blockConcurrencyWhile(async () => {
+      const now = Date.now();
+      // Drop entries whose token can no longer be presented.
+      const entries = await this.state.storage.list({ prefix: "plan:" });
+      for (const [key, expiresAt] of entries) {
+        if (!Number.isSafeInteger(expiresAt) || expiresAt <= now)
+          await this.state.storage.delete(key);
+      }
+      const key = `plan:${body.jti}`;
+      if ((await this.state.storage.get(key)) !== undefined)
+        return json({ error: "Plan already used" }, 409);
+      if (body.exp <= now) return json({ error: "Plan expired" }, 400);
+      await this.state.storage.put(key, body.exp + PLAN_CONSUMED_GRACE_MS);
+      return json({ ok: true });
+    });
+  }
+
   async fetch(request) {
     if (
       request.method !== "POST" ||
-      !["/reserve", "/release"].includes(new URL(request.url).pathname)
+      !["/reserve", "/release", "/consume-plan"].includes(
+        new URL(request.url).pathname,
+      )
     )
       return json({ error: "Not found" }, 404);
     const body = await readJson(request, 256);
@@ -1078,6 +1155,7 @@ export class DailyBudget {
       (pathname === "/reserve" && !["ai", "browser"].includes(body.kind))
     )
       return json({ error: "Invalid reservation" }, 400);
+    if (pathname === "/consume-plan") return this.consumePlan(body);
     return this.state.blockConcurrencyWhile(async () => {
       const today = new Date().toISOString().slice(0, 10);
       const emptyUsage = {
