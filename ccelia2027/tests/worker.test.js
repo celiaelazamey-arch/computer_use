@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import productionWorker, { createWorker, DailyBudget } from "../src/index.js";
 
@@ -183,6 +184,27 @@ function post(path, payload, cookie = "", origin = "https://agent.test") {
   });
 }
 
+/**
+ * Sign an arbitrary payload with the test secret, exactly the way the Worker
+ * does. Used to prove that a valid signature alone is not enough: the token
+ * must also declare its own type.
+ */
+async function signToken(payload) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const body = Buffer.from(encoder.encode(JSON.stringify(payload))).toString(
+    "base64url",
+  );
+  const signed = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
+  return `${body}.${Buffer.from(signed).toString("base64url")}`;
+}
+
 async function login(env) {
   const response = await worker.fetch(
     post("/api/login", { password: "local-test-password" }),
@@ -302,6 +324,132 @@ describe("Ccelia read-only agent Worker", () => {
     );
     assert.equal(response.status, 401);
     assert.equal(calls.ai, 0);
+  });
+
+  it("rejects a plan token replayed as a session cookie", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const planResponse = await worker.fetch(
+      post("/api/plan", { task: "open https://example.com" }, cookie),
+      env,
+    );
+    const { planToken } = await planResponse.json();
+    assert.ok(planToken, "the plan token is handed to the browser");
+
+    // Log out, then replay the plan token where a session cookie belongs.
+    // Both tokens are signed with SESSION_SECRET, so only the typ claim
+    // separates them.
+    await worker.fetch(post("/api/logout", {}), env);
+    const forged = `ccelia_session=${planToken}`;
+    const session = await worker.fetch(
+      new Request("https://agent.test/api/session", {
+        headers: { cookie: forged },
+      }),
+      env,
+    );
+    assert.deepEqual(await session.json(), { authenticated: false });
+
+    const aiCallsBefore = calls.ai;
+    const plan = await worker.fetch(
+      post("/api/plan", { task: "open https://example.com" }, forged),
+      env,
+    );
+    assert.equal(plan.status, 401);
+    assert.equal(
+      calls.ai,
+      aiCallsBefore,
+      "a replayed plan token must not reach the model",
+    );
+  });
+
+  it("rejects a session cookie replayed as a plan token", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const sessionToken = cookie.split("=")[1];
+    const response = await worker.fetch(
+      post("/api/execute", { planToken: sessionToken }, cookie),
+      env,
+    );
+    assert.equal(response.status, 400);
+    assert.equal(calls.ai, 0);
+    assert.equal(calls.browser, 0);
+  });
+
+  it("rejects a correctly signed token that declares no type", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const typeless = await signToken({ exp: Date.now() + 60_000 });
+
+    const session = await worker.fetch(
+      new Request("https://agent.test/api/session", {
+        headers: { cookie: `ccelia_session=${typeless}` },
+      }),
+      env,
+    );
+    assert.deepEqual(await session.json(), { authenticated: false });
+
+    const execute = await worker.fetch(
+      post("/api/execute", { planToken: typeless }, cookie),
+      env,
+    );
+    assert.equal(execute.status, 400);
+    assert.equal(calls.browser, 0);
+  });
+
+  it("adds security headers to every JSON response", async () => {
+    const { env } = createEnvironment();
+    const requests = [
+      new Request("https://agent.test/health"),
+      new Request("https://agent.test/api/status"),
+      post("/api/plan", { task: "open https://example.com" }),
+    ];
+    for (const request of requests) {
+      const response = await worker.fetch(request, env);
+      const policy = response.headers.get("content-security-policy") || "";
+      assert.equal(
+        response.headers.get("x-content-type-options"),
+        "nosniff",
+        request.url,
+      );
+      assert.equal(response.headers.get("x-frame-options"), "DENY");
+      assert.equal(response.headers.get("referrer-policy"), "no-referrer");
+      assert.match(policy, /default-src 'none'/);
+      assert.match(policy, /frame-ancestors 'none'/);
+    }
+  });
+
+  it("serves assets under a strict header policy with no inline script", () => {
+    const raw = readFileSync(
+      new URL("../docs/site/_headers", import.meta.url),
+      "utf8",
+    );
+    // Only directives count; `#` comments may explain what is deliberately absent.
+    const headers = raw
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+    assert.match(headers, /script-src 'self'/);
+    assert.match(headers, /connect-src 'self'/);
+    assert.match(headers, /frame-ancestors 'none'/);
+    assert.match(headers, /X-Content-Type-Options: nosniff/i);
+    assert.ok(
+      !headers.includes("unsafe-inline") && !headers.includes("unsafe-eval"),
+      "the asset CSP must not weaken itself for inline code",
+    );
+
+    const html = readFileSync(
+      new URL("../docs/site/index.html", import.meta.url),
+      "utf8",
+    );
+    const scriptTags = html.match(/<script\b[^>]*>/gi) || [];
+    assert.ok(scriptTags.length > 0, "the UI must still load its script");
+    for (const tag of scriptTags) {
+      assert.match(
+        tag,
+        /src="\/app\.js"/,
+        `every script tag must be external, or script-src 'self' would not hold: ${tag}`,
+      );
+    }
   });
 
   it("rejects cross-origin planning requests", async () => {

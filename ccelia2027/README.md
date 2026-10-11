@@ -17,7 +17,7 @@ Build an automation platform with clear security boundaries, testable components
 - `src/`: Worker API and daily-budget Durable Object.
 - `tests/`: Node built-in tests for schema validation, access control, quotas, and the Playwright session contract.
 - `docs/`: architecture, deployment, security notes, and Worker-served static assets.
-- The monorepo-root `.github/workflows/` contains the active CI, CodeQL, manual deployment, and optional NVIDIA smoke-test workflows. `.github/dependabot.yml` is also at the monorepo root. Workflow files retained under this package are templates and are not activated by GitHub from this subdirectory.
+- All CI, CodeQL, deployment, Dependabot, issue templates, and code ownership live at the monorepo root under `.github/`. This package keeps no workflow files of its own.
 
 The Worker serves the UI at `/`, health at `/health`, and secured `/api/*` routes. No paid API provider, R2, or user-supplied model key is used. A SQLite-backed Durable Object stores only rolling daily usage counters.
 
@@ -48,7 +48,7 @@ See [Development](docs/development.md) for workflow details.
 
 - **Cloudflare Worker:** the monorepo-root `.github/workflows/deploy-ccelia2027.yml` is manual-only and serves UI and API on `workers.dev`. It requires a verified Workers Free account, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, an `APP_ACCESS_PASSWORD` of at least 16 characters, and a random `SESSION_SECRET` of at least 32 characters. Its checkbox and repository variable are operator attestations, not independent billing checks.
 - **GitHub Pages:** no longer deploys this app because Pages would not provide its same-origin Worker API.
-- **Container:** no container image is built or published by the active monorepo workflows. A nested workflow template is retained under `ccelia2027/.github/workflows/container.yml` and is inactive here.
+- **Container:** no container image is built or published. `Dockerfile` remains for local `wrangler dev` use only.
 
 See [Deployment](docs/deployment.md), the monorepo [system architecture](../docs/system-architecture.md), and the root [operations and deployment guide](../CCELIA2027-DEPLOYMENT.md).
 
@@ -56,15 +56,15 @@ Read [Free-tier limits](docs/free-tier.md) before using or deploying. Do not dep
 
 ## Security
 
-Read [SECURITY.md](SECURITY.md). Never commit credentials, API keys, `.dev.vars`, or production data. Security vulnerabilities must be reported privately.
+Read the monorepo [SECURITY.md](../SECURITY.md). Never commit credentials, API keys, `.dev.vars`, or production data. Security vulnerabilities must be reported privately.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Pull requests should include tests and pass the required checks.
+See the monorepo [CONTRIBUTING.md](../CONTRIBUTING.md). Pull requests should include tests and pass `bash ./cela.sh preflight`.
 
 ## License
 
-No open-source license has been selected. `LICENSE` is only a decision-pending notice, not a license grant.
+Apache License 2.0, granted at the monorepo root in [LICENSE](../LICENSE). The bundled Lucide icons keep their own ISC/MIT notice in `docs/site/lucide-notice.txt`.
 
 ## Roadmap
 

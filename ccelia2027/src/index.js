@@ -17,6 +17,24 @@ const BROWSER_MAX_CONCURRENT = 3;
 const BROWSER_RESERVATION_TTL_MS = 120_000;
 const BROWSER_TASK_DEADLINE_MS = 45_000;
 const BROWSER_MIN_INTERVAL_MS = 20_000;
+// Token type separation. Session cookies and plan tokens are signed with the
+// same secret, so the payload must state what it is. Without this a plan token
+// (which is returned to the browser in the /api/plan body) authenticates as a
+// session cookie, and logout would not revoke it.
+const SESSION_TOKEN_TYPE = "session";
+const PLAN_TOKEN_TYPE = "plan";
+
+// Applied to every JSON response. Static assets get the equivalent, plus a
+// script/style policy, from docs/site/_headers.
+const SECURITY_HEADERS = {
+  "content-security-policy":
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "no-referrer",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+};
+
 const SENSITIVE_TERMS =
   /\b(send|submit|delete|remove|erase|purchase|buy|pay|transfer|publish|post|change|edit|password|credential|account|email|message|order)\b|إرسال|ارسل|ابعث|احذف|حذف|امسح|شراء|اشتر|ادفع|دفع|تحويل|انشر|نشر|غيّر|تغيير|عدّل|تعديل|حساب|كلمة المرور|بيانات الدخول/i;
 
@@ -29,6 +47,7 @@ function json(payload, status = 200, headers = {}) {
     headers: {
       "cache-control": "no-store",
       "content-type": "application/json; charset=utf-8",
+      ...SECURITY_HEADERS,
       ...headers,
     },
   });
@@ -91,7 +110,10 @@ async function signature(secret, value) {
 async function createSession(secret) {
   const payload = base64url(
     new TextEncoder().encode(
-      JSON.stringify({ exp: Date.now() + SESSION_SECONDS * 1_000 }),
+      JSON.stringify({
+        typ: SESSION_TOKEN_TYPE,
+        exp: Date.now() + SESSION_SECONDS * 1_000,
+      }),
     ),
   );
   return `${payload}.${base64url(await signature(secret, payload))}`;
@@ -123,6 +145,9 @@ async function validSession(request, secret) {
     const value = JSON.parse(
       new TextDecoder().decode(decodeBase64url(payload)),
     );
+    // Reject every other signed token type: a plan token must never open a
+    // session, and a token that declares no type is not accepted either.
+    if (value.typ !== SESSION_TOKEN_TYPE) return false;
     return Number.isInteger(value.exp) && value.exp > Date.now();
   } catch {
     return false;
@@ -492,6 +517,7 @@ async function signedPlan(env, plan, task) {
     ...plan.steps.map((step) => `${step.target} ${step.value} ${step.reason}`),
   ].join(" ");
   const payload = {
+    typ: PLAN_TOKEN_TYPE,
     exp: Date.now() + PLAN_SECONDS * 1_000,
     task,
     action: plan.action,
@@ -528,6 +554,8 @@ async function verifyPlanToken(env, token) {
     const value = JSON.parse(
       new TextDecoder().decode(decodeBase64url(payload)),
     );
+    // A session cookie is not a plan token, and a typeless token is rejected.
+    if (value.typ !== PLAN_TOKEN_TYPE) return null;
     if (
       !Number.isInteger(value.exp) ||
       value.exp <= Date.now() ||

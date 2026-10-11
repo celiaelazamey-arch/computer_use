@@ -81,6 +81,7 @@ print(plan.model_dump_json(indent=2))
 - `docs/`: المعمارية والبروتوكول ودليل التوسعة وقائمة تسليم التشغيل.
 - `ccelia2027/`: تطبيق Worker مستقل داخل المستودع؛ استخدم [دليل تشغيله](ccelia2027/README.md) و[دليل النشر الموحد](CCELIA2027-DEPLOYMENT.md).
 - `.github/workflows/`: CI لكلا التطبيقين، CodeQL لـ JavaScript وPython، ونشر Worker يدوي فقط.
+- `.github/`: حوكمة المستودع كلها في الجذر — `CODEOWNERS` وقوالب Issues وPull Request. لا يحتفظ `ccelia2027/` بأي ملفات workflows أو حوكمة خاصة به.
 
 ## الأوامر والفحوص
 
@@ -121,3 +122,9 @@ git diff tests/snapshots/api_surface.json
 - التكامل الحي مع Ollama يبقى غير متحقق حتى ينجح `bash ./cela.sh probe` على الجهاز المقصود. Qdrant اختياري ويُفحص منفصلاً عبر `bash ./cela.sh probe-memory`.
 
 لا تستخدم `docker compose down -v` عند إيقاف النظام، لأنه يحذف وحدات تخزين النماذج والذاكرة.
+
+## الترخيص والحوكمة
+
+المستودع مرخّص بـ Apache License 2.0؛ راجع [LICENSE](LICENSE). أيقونات Lucide المضمّنة تحتفظ بإشعارها الخاص (ISC/MIT) في `ccelia2027/docs/site/lucide-notice.txt`.
+
+كل ملفات الحوكمة في الجذر: [CONTRIBUTING.md](CONTRIBUTING.md) لسير العمل وقواعد التوسعة، و[SECURITY.md](SECURITY.md) لنطاق الثغرات والإبلاغ الخاص وحدود الأمان الموعودة، و`.github/CODEOWNERS` وقوالب Issues وPull Request. الإصدار موحَّد في `pyproject.toml` و`ccelia2027/package.json` و`docs/architecture.md` و`docs/protocol.md`، و`CHANGELOG.md` يصف الإصدار الحالي وحده دون سجل إصدارات سابق.

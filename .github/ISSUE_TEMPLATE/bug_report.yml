@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible defect in implemented behavior.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Confirm the behavior exists in the current `main` before filing. This
+        repository holds two separate runtime components; name the one affected.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - "cela.sh (local Python planner)"
+        - "ccelia2027 (Cloudflare Worker)"
+        - "Repository tooling (cela.sh script, CI, docs, contract snapshot)"
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: >
+        Include the exact command. For the planner, an exit code and the JSON on
+        stderr; for the Worker, the route and response status.
+      placeholder: 1. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: >
+        Python and Node versions, OS, and Ollama model where relevant. Include
+        non-sensitive logs only.
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety boundary
+      description: Tick only if the defect crosses a documented safety limit.
+      options:
+        - label: >
+            A plan reported `dry_run=false` or `execution_enabled=true`, memory
+            leaked across sessions, or a non-loopback endpoint was accepted.
+          required: false
+        - label: >
+            The Worker logged in, clicked, typed, submitted, mutated data, or
+            reached a private address.
+          required: false

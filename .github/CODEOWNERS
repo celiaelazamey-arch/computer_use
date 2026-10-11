@@ -1,0 +1,9 @@
+* @celiaelazamey-arch
+
+# The two runtime components have separate threat models. Any change that
+# touches a trust boundary, a secret, or the contract snapshot needs an owner.
+/src/cela_sh/ @celiaelazamey-arch
+/ccelia2027/src/ @celiaelazamey-arch
+/tools/api_surface.py @celiaelazamey-arch
+/tests/snapshots/api_surface.json @celiaelazamey-arch
+/.github/ @celiaelazamey-arch

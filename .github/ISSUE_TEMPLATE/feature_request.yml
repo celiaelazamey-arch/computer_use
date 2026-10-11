@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose one focused capability or improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - "cela.sh (local Python planner)"
+        - "ccelia2027 (Cloudflare Worker)"
+        - "Both / repository-wide"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Explain the user need without prescribing a solution.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+    validations:
+      required: true
+  - type: textarea
+    id: extension
+    attributes:
+      label: Extension path
+      description: >
+        Read docs/extension-guide.md first. State which recipe this follows, or
+        which public contract it changes. A change that adds execution ability,
+        reaches a non-loopback network, moves data between the two components,
+        or introduces a new secret needs a design discussion before code.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Security, privacy, and operational considerations
+    validations:
+      required: false

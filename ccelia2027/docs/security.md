@@ -16,11 +16,11 @@ The runtime is a read-only public-web agent. It accepts tasks after shared-passw
 - Playwright uses a fresh context with no persisted cookies, JavaScript and service workers disabled, and a route guard allowing only same-origin HTTPS GET/HEAD requests; downloads, scripts, images, media, and fonts are blocked.
 - Sensitive requests need a separate read-only confirmation. The browser executor has no form submission or state-change action.
 - Conversation text and results remain in local storage. Signed plan tokens are not persisted; after reload the user can explicitly request a new plan from the original task. If the API returns extracted evidence with a summary error, the UI retains and displays it.
-- GitHub discovers only workflows under the repository-root `.github/workflows/`. The root CI, CodeQL, and manual Cloudflare deployment workflows are active; similarly named workflow files nested under `ccelia2027/.github/workflows/` are inactive templates in this monorepo.
+- All workflows live under the repository-root `.github/workflows/`: CI, CodeQL, and the manual Cloudflare deployment. This package keeps no workflow files, so nothing runs from a subdirectory.
 
 ## Reporting
 
-Read [SECURITY.md](../SECURITY.md). Do not put vulnerability details in public issues.
+Read the monorepo [SECURITY.md](../../SECURITY.md). Do not put vulnerability details in public issues.
 
 ## Current Limitations
 
