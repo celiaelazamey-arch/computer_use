@@ -3,11 +3,20 @@ import re
 from .models import Action, Plan, PlanStatus, PlannerInput, RawPlan, RiskLevel
 
 
+# Keyword classifier, not a complete one (see docs/threat-model-cela.md, F1).
+# Consequential verbs (send, submit, post, publish, upload, email, reply, share,
+# message, order, checkout, subscribe) are matched with their common inflections,
+# so "send", "sending", "sent", "submitted", "published" all require confirmation.
+# Arabic terms have no word boundary: a substring match only over-triggers, which is
+# the safe direction for a dry-run classifier.
 SENSITIVE_TERMS = re.compile(
     r"\b(delete|remove|erase|format|wipe|purchase|buy|pay|transfer|password|credential|"
-    r"secret|api key|access token|send money|install|uninstall|shutdown|restart)\b|"
+    r"secret|api key|access token|send money|install|uninstall|shutdown|restart|"
+    r"(?:send|submit|post|publish|upload|email|e-mail|reply|share|message|order|subscribe)"
+    r"(?:s|es|ed|ing)?|replies|replying|replied|sharing|checkout|subscription)\b|"
     r"(حذف|احذف|امسح|مسح|تهيئة|فرمت|شراء|اشتر|ادفع|دفع|تحويل|كلمة المرور|كلمة السر|"
-    r"بيانات الدخول|مفتاح api|رمز وصول|إيقاف التشغيل|إعادة التشغيل)",
+    r"بيانات الدخول|مفتاح api|رمز وصول|إيقاف التشغيل|إعادة التشغيل|"
+    r"أرسل|ارسل|إرسال|ارسال|قدّم|قدم|انشر|ارفع|شارك|راسل|مراسلة|اشترك|اشتراك)",
     re.IGNORECASE,
 )
 SHELL_APP_TERMS = re.compile(r"\b(powershell|cmd\.exe|command prompt|terminal|bash|zsh|shell)\b", re.IGNORECASE)
