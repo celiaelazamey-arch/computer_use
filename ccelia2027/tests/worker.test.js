@@ -441,7 +441,7 @@ describe("Ccelia read-only agent Worker", () => {
       new URL("../docs/site/index.html", import.meta.url),
       "utf8",
     );
-    const scriptTags = html.match(/<script\b[^>]*>/g) || [];
+    const scriptTags = html.match(/<script\b[^>]*>/gi) || [];
     assert.ok(scriptTags.length > 0, "the UI must still load its script");
     for (const tag of scriptTags) {
       assert.match(
