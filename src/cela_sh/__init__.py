@@ -1,11 +1,21 @@
+from .cli import EXIT_CODES
 from .factory import create_planner
 from .memory import (
+    BUILTIN_MEMORY_BACKENDS,
+    DISABLED_BACKEND,
     EmbeddingProvider,
     MemoryStore,
     MemoryStoreError,
     MockMemoryStore,
     OllamaEmbeddingProvider,
     QdrantMemoryStore,
+    build_memory_store,
+    is_known_memory_backend,
+    memory_backend_names,
+    register_memory_backend,
+    registered_memory_backends,
+    satisfies_memory_contract,
+    unregister_memory_backend,
 )
 from .planner.client import (
     OllamaPlanner,
@@ -19,6 +29,9 @@ from .planner.models import Action, Plan, PlanStatus, RiskLevel
 from .settings import ConfigurationError, Settings
 
 __all__ = [
+    "BUILTIN_MEMORY_BACKENDS",
+    "DISABLED_BACKEND",
+    "EXIT_CODES",
     "Action",
     "ConfigurationError",
     "EmbeddingProvider",
@@ -37,5 +50,12 @@ __all__ = [
     "QdrantMemoryStore",
     "RiskLevel",
     "Settings",
+    "build_memory_store",
     "create_planner",
+    "is_known_memory_backend",
+    "memory_backend_names",
+    "register_memory_backend",
+    "registered_memory_backends",
+    "satisfies_memory_contract",
+    "unregister_memory_backend",
 ]

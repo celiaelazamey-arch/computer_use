@@ -2,6 +2,8 @@ import math
 import os
 from dataclasses import dataclass
 
+from .memory.registry import memory_backend_names
+
 
 class ConfigurationError(ValueError):
     """Raised when runtime settings are missing or invalid."""
@@ -47,8 +49,10 @@ class Settings:
             raise ConfigurationError("CELA_OLLAMA_URL must not be blank.")
         if not self.planner_model.strip() or not self.embedding_model.strip():
             raise ConfigurationError("Model names must not be blank.")
-        if self.memory_backend not in {"disabled", "qdrant"}:
-            raise ConfigurationError("CELA_MEMORY_BACKEND must be 'disabled' or 'qdrant'.")
+        if self.memory_backend not in memory_backend_names():
+            valid = ", ".join(f"'{name}'" for name in memory_backend_names())
+            given = repr(self.memory_backend[:40])
+            raise ConfigurationError(f"CELA_MEMORY_BACKEND {given} is not supported. Valid backends: {valid}.")
         if self.memory_backend == "qdrant" and (
             not self.qdrant_url.strip() or not self.qdrant_collection.strip()
         ):

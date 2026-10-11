@@ -22,6 +22,7 @@ class QdrantMemoryStore(MemoryStore):
         embedding_provider: EmbeddingProvider | None = None,
         timeout: tuple[float, float] = (3.05, 15.0),
         api_key: str | None = None,
+        session: requests.Session | None = None,
     ) -> None:
         if not collection_name or len(collection_name) > 255 or any(char not in "-_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" for char in collection_name):
             raise ValueError("collection_name contains unsupported characters")
@@ -45,7 +46,9 @@ class QdrantMemoryStore(MemoryStore):
         self.timeout = timeout
         self._collection_path = f"/collections/{quote(collection_name, safe='')}"
         self._vector_size: int | None = None
-        self._session = requests.Session()
+        # Injected transport seam: tests can supply an offline double instead of
+        # patching a private attribute. Any object exposing request()/headers works.
+        self._session = requests.Session() if session is None else session
         self._session.trust_env = False
         if api_key is not None:
             self._session.headers.update({"api-key": api_key})

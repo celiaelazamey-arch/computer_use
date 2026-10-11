@@ -1,0 +1,494 @@
+{
+  "python": {
+    "builtin_memory_backends": [
+      "disabled",
+      "qdrant"
+    ],
+    "cli_flags": [
+      {
+        "default": "'==SUPPRESS=='",
+        "nargs": "0",
+        "options": [
+          "--help",
+          "-h"
+        ],
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "nargs": null,
+        "options": [
+          "--goal"
+        ],
+        "required": true,
+        "type": "non_blank"
+      },
+      {
+        "default": "''",
+        "nargs": null,
+        "options": [
+          "--context"
+        ],
+        "required": false,
+        "type": null
+      },
+      {
+        "default": "None",
+        "nargs": null,
+        "options": [
+          "--model"
+        ],
+        "required": false,
+        "type": "non_blank"
+      },
+      {
+        "default": "None",
+        "nargs": null,
+        "options": [
+          "--session-id"
+        ],
+        "required": false,
+        "type": "non_blank"
+      }
+    ],
+    "exit_codes": {
+      "cli_usage_error": 2,
+      "configuration_error": 2,
+      "interrupted": 130,
+      "ok": 0,
+      "planner_connection_error": 3,
+      "planner_error": 1,
+      "planner_memory_error": 6,
+      "planner_response_error": 4,
+      "planner_validation_error": 5
+    },
+    "exports": {
+      "Action": {
+        "bases": [
+          "builtins.str",
+          "enum.Enum"
+        ],
+        "init": null,
+        "kind": "class",
+        "members": {
+          "ASK_USER": "ASK_USER",
+          "CLICK": "CLICK",
+          "NAVIGATE": "NAVIGATE",
+          "OBSERVE": "OBSERVE",
+          "OPEN_APP": "OPEN_APP",
+          "SCROLL": "SCROLL",
+          "SEARCH_WEB": "SEARCH_WEB",
+          "STOP": "STOP",
+          "TYPE": "TYPE",
+          "WAIT": "WAIT"
+        },
+        "methods": {}
+      },
+      "BUILTIN_MEMORY_BACKENDS": {
+        "kind": "set",
+        "value": [
+          "disabled",
+          "qdrant"
+        ]
+      },
+      "ConfigurationError": {
+        "bases": [
+          "builtins.ValueError"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "DISABLED_BACKEND": {
+        "kind": "str",
+        "value": "'disabled'"
+      },
+      "EXIT_CODES": {
+        "kind": "mapping",
+        "value": {
+          "cli_usage_error": 2,
+          "configuration_error": 2,
+          "interrupted": 130,
+          "ok": 0,
+          "planner_connection_error": 3,
+          "planner_error": 1,
+          "planner_memory_error": 6,
+          "planner_response_error": 4,
+          "planner_validation_error": 5
+        }
+      },
+      "EmbeddingProvider": {
+        "bases": [
+          "abc.ABC"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {
+          "embed": "(self, text: str) -> list[float]"
+        }
+      },
+      "MemoryStore": {
+        "bases": [
+          "abc.ABC"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {
+          "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
+        }
+      },
+      "MemoryStoreError": {
+        "bases": [
+          "builtins.RuntimeError"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "MockMemoryStore": {
+        "bases": [
+          "cela_sh.memory.base.MemoryStore"
+        ],
+        "init": "(self) -> None",
+        "kind": "class",
+        "methods": {
+          "__init__": "(self) -> None",
+          "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
+        }
+      },
+      "OllamaEmbeddingProvider": {
+        "bases": [
+          "cela_sh.memory.embeddings.EmbeddingProvider"
+        ],
+        "init": "(self, model: str = 'nomic-embed-text', base_url: str = 'http://127.0.0.1:11434', timeout: tuple[float, float] = (3.05, 60.0)) -> None",
+        "kind": "class",
+        "methods": {
+          "__init__": "(self, model: str = 'nomic-embed-text', base_url: str = 'http://127.0.0.1:11434', timeout: tuple[float, float] = (3.05, 60.0)) -> None",
+          "embed": "(self, text: str) -> list[float]"
+        }
+      },
+      "OllamaPlanner": {
+        "bases": [
+          "builtins.object"
+        ],
+        "init": "(self, model: str = 'qwen2.5:3b', timeout: tuple[float, float] = (3.05, 60.0), memory_store: cela_sh.memory.base.MemoryStore | None = None, memory_limit: int = 3, base_url: str = 'http://127.0.0.1:11434')",
+        "kind": "class",
+        "methods": {
+          "__init__": "(self, model: str = 'qwen2.5:3b', timeout: tuple[float, float] = (3.05, 60.0), memory_store: cela_sh.memory.base.MemoryStore | None = None, memory_limit: int = 3, base_url: str = 'http://127.0.0.1:11434')",
+          "generate_plan": "(self, goal: str, screen_context: str = '', session_id: str | None = None) -> cela_sh.planner.models.Plan"
+        }
+      },
+      "Plan": {
+        "bases": [
+          "cela_sh.planner.models.StrictModel"
+        ],
+        "fields": {
+          "analysis": {
+            "annotation": "str",
+            "required": true
+          },
+          "dry_run": {
+            "annotation": "typing.Literal[True]",
+            "required": false
+          },
+          "execution_enabled": {
+            "annotation": "typing.Literal[False]",
+            "required": false
+          },
+          "requires_confirmation": {
+            "annotation": "bool",
+            "required": true
+          },
+          "status": {
+            "annotation": "PlanStatus",
+            "required": true
+          },
+          "steps": {
+            "annotation": "list[cela_sh.planner.models.PlannedStep]",
+            "required": true
+          }
+        },
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "PlanStatus": {
+        "bases": [
+          "builtins.str",
+          "enum.Enum"
+        ],
+        "init": null,
+        "kind": "class",
+        "members": {
+          "BLOCKED": "blocked",
+          "READY": "ready",
+          "REQUIRES_CONFIRMATION": "requires_confirmation"
+        },
+        "methods": {}
+      },
+      "PlannerConnectionError": {
+        "bases": [
+          "cela_sh.planner.client.PlannerError"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "PlannerError": {
+        "bases": [
+          "builtins.RuntimeError"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "PlannerMemoryError": {
+        "bases": [
+          "cela_sh.planner.client.PlannerError"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "PlannerResponseError": {
+        "bases": [
+          "cela_sh.planner.client.PlannerError"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "PlannerValidationError": {
+        "bases": [
+          "cela_sh.planner.client.PlannerError"
+        ],
+        "init": null,
+        "kind": "class",
+        "methods": {}
+      },
+      "QdrantMemoryStore": {
+        "bases": [
+          "cela_sh.memory.base.MemoryStore"
+        ],
+        "init": "(self, collection_name: str = 'agent_memory', qdrant_url: str = 'http://127.0.0.1:6333', embedding_provider: cela_sh.memory.embeddings.EmbeddingProvider | None = None, timeout: tuple[float, float] = (3.05, 15.0), api_key: str | None = None, session: requests.sessions.Session | None = None) -> None",
+        "kind": "class",
+        "methods": {
+          "__init__": "(self, collection_name: str = 'agent_memory', qdrant_url: str = 'http://127.0.0.1:6333', embedding_provider: cela_sh.memory.embeddings.EmbeddingProvider | None = None, timeout: tuple[float, float] = (3.05, 15.0), api_key: str | None = None, session: requests.sessions.Session | None = None) -> None",
+          "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
+        }
+      },
+      "RiskLevel": {
+        "bases": [
+          "builtins.str",
+          "enum.Enum"
+        ],
+        "init": null,
+        "kind": "class",
+        "members": {
+          "BLOCKED": "blocked",
+          "LOW": "low",
+          "REQUIRES_CONFIRMATION": "requires_confirmation"
+        },
+        "methods": {}
+      },
+      "Settings": {
+        "bases": [
+          "builtins.object"
+        ],
+        "fields": {
+          "connect_timeout": {
+            "annotation": "float",
+            "required": false
+          },
+          "embedding_model": {
+            "annotation": "str",
+            "required": false
+          },
+          "memory_backend": {
+            "annotation": "str",
+            "required": false
+          },
+          "memory_limit": {
+            "annotation": "int",
+            "required": false
+          },
+          "ollama_url": {
+            "annotation": "str",
+            "required": false
+          },
+          "planner_model": {
+            "annotation": "str",
+            "required": false
+          },
+          "qdrant_api_key": {
+            "annotation": "str | None",
+            "required": false
+          },
+          "qdrant_collection": {
+            "annotation": "str",
+            "required": false
+          },
+          "qdrant_url": {
+            "annotation": "str",
+            "required": false
+          },
+          "read_timeout": {
+            "annotation": "float",
+            "required": false
+          }
+        },
+        "init": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None",
+        "kind": "class",
+        "methods": {
+          "__init__": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None"
+        }
+      },
+      "build_memory_store": {
+        "kind": "callable",
+        "signature": "(name: str, settings: cela_sh.memory.registry.MemoryBackendSettings, timeout: tuple[float, float]) -> cela_sh.memory.base.MemoryStore"
+      },
+      "create_planner": {
+        "kind": "callable",
+        "signature": "(settings: cela_sh.settings.Settings | None = None, model: str | None = None) -> cela_sh.planner.client.OllamaPlanner"
+      },
+      "is_known_memory_backend": {
+        "kind": "callable",
+        "signature": "(name: object) -> bool"
+      },
+      "memory_backend_names": {
+        "kind": "callable",
+        "signature": "() -> tuple[str, ...]"
+      },
+      "register_memory_backend": {
+        "kind": "callable",
+        "signature": "(name: str, builder: collections.abc.Callable[[cela_sh.memory.registry.MemoryBackendSettings, tuple[float, float]], cela_sh.memory.base.MemoryStore], *, replace: bool = False) -> None"
+      },
+      "registered_memory_backends": {
+        "kind": "callable",
+        "signature": "() -> tuple[str, ...]"
+      },
+      "satisfies_memory_contract": {
+        "kind": "callable",
+        "signature": "(candidate: object) -> bool"
+      },
+      "unregister_memory_backend": {
+        "kind": "callable",
+        "signature": "(name: str) -> bool"
+      }
+    },
+    "memory_backends": [
+      "disabled",
+      "qdrant"
+    ],
+    "package_exports": {
+      "cela_sh": [
+        "Action",
+        "BUILTIN_MEMORY_BACKENDS",
+        "ConfigurationError",
+        "DISABLED_BACKEND",
+        "EXIT_CODES",
+        "EmbeddingProvider",
+        "MemoryStore",
+        "MemoryStoreError",
+        "MockMemoryStore",
+        "OllamaEmbeddingProvider",
+        "OllamaPlanner",
+        "Plan",
+        "PlanStatus",
+        "PlannerConnectionError",
+        "PlannerError",
+        "PlannerMemoryError",
+        "PlannerResponseError",
+        "PlannerValidationError",
+        "QdrantMemoryStore",
+        "RiskLevel",
+        "Settings",
+        "build_memory_store",
+        "create_planner",
+        "is_known_memory_backend",
+        "memory_backend_names",
+        "register_memory_backend",
+        "registered_memory_backends",
+        "satisfies_memory_contract",
+        "unregister_memory_backend"
+      ],
+      "cela_sh.memory": [
+        "BUILTIN_MEMORY_BACKENDS",
+        "DISABLED_BACKEND",
+        "EmbeddingProvider",
+        "MemoryBackendBuilder",
+        "MemoryBackendSettings",
+        "MemoryStore",
+        "MemoryStoreError",
+        "MockMemoryStore",
+        "OllamaEmbeddingProvider",
+        "QdrantMemoryStore",
+        "build_memory_store",
+        "is_known_memory_backend",
+        "memory_backend_names",
+        "register_memory_backend",
+        "registered_memory_backends",
+        "satisfies_memory_contract",
+        "unregister_memory_backend"
+      ],
+      "cela_sh.planner": [
+        "Action",
+        "OllamaPlanner",
+        "Plan",
+        "PlanStatus",
+        "PlannerConnectionError",
+        "PlannerError",
+        "PlannerMemoryError",
+        "PlannerResponseError",
+        "PlannerValidationError",
+        "RiskLevel"
+      ]
+    }
+  },
+  "schema_version": 1,
+  "worker": {
+    "exports": [
+      "DailyBudget",
+      "createWorker"
+    ],
+    "has_default_export": true,
+    "route_prefixes": [
+      "/api/"
+    ],
+    "routes": [
+      {
+        "method": "POST",
+        "path": "/api/execute"
+      },
+      {
+        "method": "POST",
+        "path": "/api/login"
+      },
+      {
+        "method": "POST",
+        "path": "/api/logout"
+      },
+      {
+        "method": "POST",
+        "path": "/api/plan"
+      },
+      {
+        "method": "GET",
+        "path": "/api/session"
+      },
+      {
+        "method": "GET",
+        "path": "/api/status"
+      },
+      {
+        "method": "GET",
+        "path": "/health"
+      }
+    ],
+    "source": "ccelia2027/src/index.js"
+  }
+}

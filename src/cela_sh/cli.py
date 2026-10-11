@@ -13,6 +13,21 @@ from .planner.client import (
 )
 from .settings import ConfigurationError, Settings
 
+#: The CLI's stable machine contract: one exit code per error code. Scripts and
+#: tests branch on these numbers, so changing one is a breaking change and is
+#: caught by the snapshot in ``tests/snapshots/api_surface.json``.
+EXIT_CODES: dict[str, int] = {
+    "ok": 0,
+    "planner_error": 1,
+    "cli_usage_error": 2,
+    "configuration_error": 2,
+    "planner_connection_error": 3,
+    "planner_response_error": 4,
+    "planner_validation_error": 5,
+    "planner_memory_error": 6,
+    "interrupted": 130,
+}
+
 
 def write_error(code: str, message: str, usage: str | None = None) -> None:
     error = {"code": code, "message": message}
@@ -24,7 +39,7 @@ def write_error(code: str, message: str, usage: str | None = None) -> None:
 class JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         write_error("cli_usage_error", message, self.format_usage().strip())
-        raise SystemExit(2)
+        raise SystemExit(EXIT_CODES["cli_usage_error"])
 
 
 def non_blank(value: str) -> str:
@@ -51,25 +66,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         plan = planner.generate_plan(args.goal, args.context, session_id=args.session_id)
     except (ConfigurationError, ValueError) as exc:
         write_error("configuration_error", str(exc))
-        return 2
+        return EXIT_CODES["configuration_error"]
     except PlannerConnectionError as exc:
         write_error("planner_connection_error", str(exc))
-        return 3
+        return EXIT_CODES["planner_connection_error"]
     except PlannerResponseError as exc:
         write_error("planner_response_error", str(exc))
-        return 4
+        return EXIT_CODES["planner_response_error"]
     except PlannerValidationError as exc:
         write_error("planner_validation_error", str(exc))
-        return 5
+        return EXIT_CODES["planner_validation_error"]
     except PlannerMemoryError as exc:
         write_error("planner_memory_error", str(exc))
-        return 6
+        return EXIT_CODES["planner_memory_error"]
     except PlannerError as exc:
         write_error("planner_error", str(exc))
-        return 1
+        return EXIT_CODES["planner_error"]
     except KeyboardInterrupt:
         write_error("interrupted", "Planning was interrupted.")
-        return 130
+        return EXIT_CODES["interrupted"]
 
     sys.stdout.write(plan.model_dump_json(indent=2) + "\n")
-    return 0
+    return EXIT_CODES["ok"]
