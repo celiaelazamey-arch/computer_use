@@ -2,6 +2,13 @@
 
 This project keeps **one current version** and no historical release line. `main` is the only development branch: superseded behavior is removed rather than deprecated, and there are no backports. The version string is identical in `pyproject.toml`, `ccelia2027/package.json`, `docs/architecture.md`, and `docs/protocol.md`.
 
+## Unreleased
+
+### Security
+
+- `cela.sh`: consequential verbs (send, submit, post, publish, upload, email, reply, share, message, order, checkout, subscribe, and their Arabic equivalents) now require confirmation instead of returning `ready` with `low` risk. Classification applies to the goal and to each step.
+- `ccelia2027`: each plan token can be executed once. Replays return 409 `plan_already_used` before any browser starts. Plan tokens issued before this change have no `jti` and are rejected. For a short window during deploy, users with unexpired old-format tokens get a 400 and must create a new plan.
+
 ## 1.0.0
 
 One product with two deliberately separate runtimes. They share maintenance, CI, documentation, and dependency governance, and nothing else: no runtime call, no shared secret, no shared data store.
