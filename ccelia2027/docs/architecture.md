@@ -12,7 +12,7 @@ Browser (Manus Mini UI; history in localStorage)
      -> Workers AI: summarize extracted page evidence
 ```
 
-There is no R2, external model provider, user-supplied API key, or paid fallback. The SQLite-backed Durable Object keeps only one day's counters. Each task gets a fresh browser context with no saved cookies; page JavaScript and service workers are disabled, and the session cannot click, type, submit forms, download files, or access authenticated accounts.
+There is no R2, external model provider, user-supplied API key, or paid fallback. The SQLite-backed Durable Object keeps only one day's counters and the set of used plan IDs. Those IDs expire five seconds after their token does. All AI reservations, browser reservations, and plan consumptions go through this one object, so they are serialized. This is a known architectural limit; see [free-tier.md](free-tier.md). Each task gets a fresh browser context with no saved cookies; page JavaScript and service workers are disabled, and the session cannot click, type, submit forms, download files, or access authenticated accounts.
 
 ## Safety Boundaries
 

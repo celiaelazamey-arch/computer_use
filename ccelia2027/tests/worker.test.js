@@ -25,13 +25,23 @@ const goodPlan = JSON.stringify({
 
 function createState() {
   const values = new Map();
+  // Durable Objects run blockConcurrencyWhile callbacks one at a time. The stub
+  // must do the same, or concurrency tests would prove nothing.
+  let queue = Promise.resolve();
   return {
     values,
     storage: {
       get: async (key) => values.get(key),
       put: async (key, value) => values.set(key, structuredClone(value)),
+      delete: async (key) => values.delete(key),
+      list: async ({ prefix = "" } = {}) =>
+        new Map([...values].filter(([key]) => key.startsWith(prefix))),
     },
-    blockConcurrencyWhile: async (callback) => callback(),
+    blockConcurrencyWhile(callback) {
+      const run = queue.then(callback);
+      queue = run.catch(() => {});
+      return run;
+    },
   };
 }
 
@@ -41,6 +51,7 @@ function createEnvironment({
   summaryError,
   browserError,
   budgetAllowed = true,
+  budgetFailsOn,
   password = "local-test-password",
 } = {}) {
   const state = createState();
@@ -164,6 +175,11 @@ function createEnvironment({
       idFromName: () => "global",
       get: () => ({
         fetch: async (input, init) => {
+          if (
+            budgetFailsOn &&
+            new URL(String(input)).pathname === budgetFailsOn
+          )
+            throw new Error("ledger unavailable");
           if (!budgetAllowed) return new Response("blocked", { status: 429 });
           return actor.fetch(new Request(input, init));
         },
@@ -883,5 +899,169 @@ describe("Ccelia read-only agent Worker", () => {
     const usage = await state.storage.get("daily_usage");
     assert.equal(usage.browserRuns, 5);
     assert.equal(usage.browserMs, 600_000);
+  });
+
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const decodePlanPayload = (token) => {
+    const part = token.split(".")[0].replaceAll("-", "+").replaceAll("_", "/");
+    const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
+    return JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+  };
+  const planTask = "افتح https://example.com واقرأ الصفحة";
+  const onPublicDns = (fn) =>
+    withDnsAnswers(["93.184.216.34"], fn, ["2606:4700:4700::1111"]);
+
+  it("issues every plan token with its own random jti", async () => {
+    const { env } = createEnvironment();
+    const cookie = await login(env);
+    const first = await (
+      await worker.fetch(post("/api/plan", { task: planTask }, cookie), env)
+    ).json();
+    const second = await (
+      await worker.fetch(post("/api/plan", { task: planTask }, cookie), env)
+    ).json();
+    const firstJti = decodePlanPayload(first.planToken).jti;
+    const secondJti = decodePlanPayload(second.planToken).jti;
+    assert.match(firstJti, UUID);
+    assert.match(secondJti, UUID);
+    assert.notEqual(firstJti, secondJti);
+  });
+
+  it("rejects a second execution of the same plan token before any browser starts", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const { planToken } = await (
+      await worker.fetch(post("/api/plan", { task: planTask }, cookie), env)
+    ).json();
+    const first = await onPublicDns(() =>
+      worker.fetch(post("/api/execute", { planToken }, cookie), env),
+    );
+    assert.equal(first.status, 200);
+    const second = await onPublicDns(() =>
+      worker.fetch(post("/api/execute", { planToken }, cookie), env),
+    );
+    assert.equal(second.status, 409);
+    assert.equal((await second.json()).code, "plan_already_used");
+    assert.equal(calls.browser, 1);
+  });
+
+  it("does not consume a plan refused for missing confirmation", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    // "احذف" is a SENSITIVE_TERMS match, so the plan needs confirmation.
+    const sensitiveTask =
+      "احذف الكوكيز ثم افتح https://example.com واقرأ الصفحة";
+    const planned = await (
+      await worker.fetch(
+        post("/api/plan", { task: sensitiveTask }, cookie),
+        env,
+      )
+    ).json();
+    assert.equal(planned.plan.requiresConfirmation, true);
+    const { planToken } = planned;
+    const refused = await worker.fetch(
+      post("/api/execute", { planToken }, cookie),
+      env,
+    );
+    assert.equal(refused.status, 409);
+    const confirmed = await onPublicDns(() =>
+      worker.fetch(
+        post("/api/execute", { planToken, confirmed: true }, cookie),
+        env,
+      ),
+    );
+    assert.equal(confirmed.status, 200);
+    assert.equal(calls.browser, 1);
+  });
+
+  it("keeps a plan token consumed when DNS refuses the destination", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const { planToken } = await (
+      await worker.fetch(post("/api/plan", { task: planTask }, cookie), env)
+    ).json();
+    const refused = await withDnsAnswers(["10.0.0.5"], () =>
+      worker.fetch(post("/api/execute", { planToken }, cookie), env),
+    );
+    assert.equal(refused.status, 400);
+    const retry = await onPublicDns(() =>
+      worker.fetch(post("/api/execute", { planToken }, cookie), env),
+    );
+    assert.equal(retry.status, 409);
+    assert.equal((await retry.json()).code, "plan_already_used");
+    assert.equal(calls.browser, 0);
+  });
+
+  it("fails closed with no browser when the plan ledger is unavailable", async () => {
+    const { env, calls } = createEnvironment({
+      budgetFailsOn: "/consume-plan",
+    });
+    const cookie = await login(env);
+    const { planToken } = await (
+      await worker.fetch(post("/api/plan", { task: planTask }, cookie), env)
+    ).json();
+    const response = await onPublicDns(() =>
+      worker.fetch(post("/api/execute", { planToken }, cookie), env),
+    );
+    assert.equal(response.status, 503);
+    assert.equal(calls.browser, 0);
+  });
+
+  it("rejects a correctly signed plan token that carries no jti", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const legacy = await signToken({
+      typ: "plan",
+      exp: Date.now() + 60_000,
+      task: planTask,
+      action: "browse",
+      url: "https://example.com/",
+      query: "",
+      reason: "قراءة الصفحة.",
+      needsConfirmation: false,
+    });
+    const response = await onPublicDns(() =>
+      worker.fetch(post("/api/execute", { planToken: legacy }, cookie), env),
+    );
+    assert.equal(response.status, 400);
+    assert.equal(calls.browser, 0);
+  });
+
+  it("consumes a plan id once when two requests race for it", async () => {
+    const state = createState();
+    const actor = new DailyBudget(state);
+    const body = {
+      jti: "11111111-1111-4111-8111-111111111111",
+      exp: Date.now() + 300_000,
+    };
+    const results = await Promise.all([
+      actor.fetch(post("/consume-plan", body)),
+      actor.fetch(post("/consume-plan", body)),
+    ]);
+    assert.deepEqual(results.map((item) => item.status).sort(), [200, 409]);
+  });
+
+  it("rejects a malformed plan id at the ledger", async () => {
+    const actor = new DailyBudget(createState());
+    const response = await actor.fetch(
+      post("/consume-plan", { jti: "not-a-uuid", exp: Date.now() + 1000 }),
+    );
+    assert.equal(response.status, 400);
+  });
+
+  it("drops expired plan ids when recording a new one", async () => {
+    const state = createState();
+    const actor = new DailyBudget(state);
+    const old = "22222222-2222-4222-8222-222222222222";
+    const fresh = "33333333-3333-4333-8333-333333333333";
+    await actor.fetch(
+      post("/consume-plan", { jti: old, exp: Date.now() + 300_000 }),
+    );
+    state.values.set(`plan:${old}`, Date.now() - 1);
+    await actor.fetch(
+      post("/consume-plan", { jti: fresh, exp: Date.now() + 300_000 }),
+    );
+    assert.equal(state.values.has(`plan:${old}`), false);
+    assert.equal(state.values.has(`plan:${fresh}`), true);
   });
 });
