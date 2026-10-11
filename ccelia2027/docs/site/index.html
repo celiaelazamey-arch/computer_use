@@ -3,220 +3,617 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f4f3ed" />
+    <meta name="theme-color" content="#101214" />
     <meta
       name="description"
-      content="Cela.sh: مساحة عربية لقراءة صفحات الويب العامة بأمان."
+      content="Cela.sh: مساحة قراءة آمنة للصفحات العامة، مع خطة مراجعة وسجل تشغيل واضح."
     />
     <title>Cela.sh | مساحة القراءة الآمنة</title>
     <link rel="stylesheet" href="/ccelia.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar" aria-label="التنقل">
+    <div class="app-shell" id="app-shell">
+      <header class="browser-chrome" dir="ltr" aria-label="شريط مساحة العمل">
+        <div class="chrome-window-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="chrome-tabs" role="tablist" aria-label="مساحات Cela.sh">
+          <button
+            class="chrome-tab active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >
+            <span class="brand-mini" aria-hidden="true">C</span>
+            <span>Cela.sh Reader</span>
+            <span class="tab-close" aria-hidden="true">×</span>
+          </button>
+          <button
+            class="chrome-tab secondary-tab"
+            id="activity-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+          >
+            <span class="icon icon-library" aria-hidden="true"></span>
+            <span>سجل القراءة</span>
+          </button>
+          <button
+            class="chrome-add-tab"
+            type="button"
+            disabled
+            aria-label="تبويب جديد قريبًا"
+          >
+            <span class="icon icon-plus" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="address-row">
+          <div class="browser-controls" aria-label="عناصر تحكم الصفحة">
+            <button
+              class="chrome-control"
+              type="button"
+              disabled
+              aria-label="رجوع"
+            >
+              <span
+                class="icon icon-chevron-down flip-icon"
+                aria-hidden="true"
+              ></span>
+            </button>
+            <button
+              class="chrome-control"
+              type="button"
+              disabled
+              aria-label="تقدم"
+            >
+              <span class="icon icon-chevron-down" aria-hidden="true"></span>
+            </button>
+            <button
+              class="chrome-control"
+              id="browser-reload"
+              type="button"
+              aria-label="تحديث الصفحة"
+            >
+              <span class="icon icon-rotate-cw" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="address-field">
+            <span class="icon icon-lock-keyhole" aria-hidden="true"></span>
+            <span id="origin-label" class="address-host"
+              >ccelia2027.celiaelazamey.workers.dev</span
+            >
+            <span class="address-secure">HTTPS</span>
+          </div>
+          <button
+            class="chrome-control chrome-profile"
+            id="copy-origin"
+            type="button"
+            aria-label="نسخ عنوان التطبيق"
+          >
+            <span class="brand-mini" aria-hidden="true">C</span>
+          </button>
+        </div>
+      </header>
+
+      <aside id="sidebar" class="sidebar" aria-label="التنقل" dir="rtl">
         <a class="brand" href="/" aria-label="Cela.sh، الصفحة الرئيسية">
-          <span class="brand-mark" aria-hidden="true"><span>C</span></span>
+          <span class="brand-mark" aria-hidden="true">C</span>
           <span class="brand-copy">
             <strong>Cela.sh</strong>
             <small>مساحة القراءة الآمنة</small>
           </span>
+          <span class="brand-status" aria-hidden="true"></span>
         </a>
+
         <nav class="side-nav" aria-label="القائمة الرئيسية">
+          <div class="nav-group-label">مساحة العمل</div>
           <button class="nav-item active" id="new-task-nav" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <span class="icon icon-plus" aria-hidden="true"></span>
             <span>مهمة جديدة</span>
+            <kbd>Ctrl K</kbd>
           </button>
           <button class="nav-item" id="history-nav" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="8.5" />
-              <path d="M12 7v5l3 2" />
-            </svg>
+            <span class="icon icon-clock-3" aria-hidden="true"></span>
             <span>سجل القراءة</span>
           </button>
           <button class="nav-item" id="safety-nav" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="m12 3 7 3v5c0 4.5-2.7 7.9-7 10-4.3-2.1-7-5.5-7-10V6l7-3Z"
-              />
-              <path d="m9 12 2 2 4-4" />
-            </svg>
+            <span class="icon icon-shield-check" aria-hidden="true"></span>
             <span>سياسة الأمان</span>
           </button>
+
+          <div class="nav-group-label nav-group-spaced">استكشف</div>
+          <button
+            class="nav-item nav-soon"
+            type="button"
+            disabled
+            title="قريبًا"
+          >
+            <span class="icon icon-monitor" aria-hidden="true"></span>
+            <span>أجهزة الكمبيوتر</span>
+            <small>قريبًا</small>
+          </button>
+          <button
+            class="nav-item nav-soon"
+            type="button"
+            disabled
+            title="قريبًا"
+          >
+            <span class="icon icon-bot" aria-hidden="true"></span>
+            <span>الوكلاء</span>
+            <small>قريبًا</small>
+          </button>
+          <button
+            class="nav-item nav-soon"
+            type="button"
+            disabled
+            title="قريبًا"
+          >
+            <span class="icon icon-library" aria-hidden="true"></span>
+            <span>المكتبة</span>
+            <small>قريبًا</small>
+          </button>
+          <button
+            class="nav-item nav-soon"
+            type="button"
+            disabled
+            title="قريبًا"
+          >
+            <span class="icon icon-image" aria-hidden="true"></span>
+            <span>الإبداعات</span>
+            <small>قريبًا</small>
+          </button>
+          <button
+            class="nav-item nav-soon"
+            type="button"
+            disabled
+            title="قريبًا"
+          >
+            <span class="icon icon-workflow" aria-hidden="true"></span>
+            <span>الأتمتة</span>
+            <small>قريبًا</small>
+          </button>
+          <button
+            class="nav-item nav-soon"
+            type="button"
+            disabled
+            title="قريبًا"
+          >
+            <span class="icon icon-puzzle" aria-hidden="true"></span>
+            <span>الإضافات</span>
+            <small>قريبًا</small>
+          </button>
+          <button
+            class="nav-item nav-soon"
+            type="button"
+            disabled
+            title="قريبًا"
+          >
+            <span class="icon icon-ellipsis" aria-hidden="true"></span>
+            <span>المزيد</span>
+            <small>قريبًا</small>
+          </button>
         </nav>
-        <section class="sidebar-section project-section" aria-label="المشروع">
-          <div class="section-label">مساحة العمل</div>
+
+        <section class="sidebar-section project-section" aria-label="المشاريع">
+          <div class="section-heading">
+            <span class="section-label">المشاريع</span>
+            <button
+              class="icon-button subtle-button"
+              type="button"
+              disabled
+              aria-label="مشروع جديد قريبًا"
+              title="قريبًا"
+            >
+              <span class="icon icon-plus" aria-hidden="true"></span>
+            </button>
+          </div>
           <div class="project-card">
-            <span class="project-mark" aria-hidden="true">C</span>
+            <span class="project-mark" aria-hidden="true"
+              ><span class="icon icon-bot"></span
+            ></span>
             <span class="project-copy">
-              <strong>Cela.sh</strong>
-              <small>استكشاف الويب العام</small>
+              <strong>Cela Reader</strong>
+              <small>قراءة الويب العام</small>
             </span>
-            <span class="project-dot" aria-label="نشط"></span>
+            <span class="project-dot" aria-label="المشروع نشط"></span>
           </div>
         </section>
+
         <section
           id="recent-section"
           class="sidebar-section recent-section"
           aria-label="المهام الأخيرة"
         >
-          <div class="section-label">
-            <span>المهام الأخيرة</span>
-            <span id="history-count" class="section-count">0</span>
+          <div class="section-heading">
+            <span class="section-label">المهام الأخيرة</span>
+            <span id="history-count" class="section-count">00</span>
           </div>
           <div id="history-list" class="history-list"></div>
-          <p id="history-empty" class="history-empty">ستظهر مهامك هنا</p>
+          <p id="history-empty" class="history-empty">ستظهر مهام القراءة هنا</p>
         </section>
+
+        <div class="sidebar-spacer"></div>
         <div class="sidebar-footer">
           <span class="user-avatar" aria-hidden="true">C</span>
           <span class="user-copy">
             <strong>Celia Elazamey</strong>
             <small>مساحة شخصية</small>
           </span>
-          <span class="user-presence" aria-label="متصل"></span>
+          <button
+            class="icon-button settings-button"
+            type="button"
+            disabled
+            aria-label="الإعدادات قريبًا"
+            title="قريبًا"
+          >
+            <span class="icon icon-settings-2" aria-hidden="true"></span>
+          </button>
         </div>
       </aside>
 
-      <main class="main-panel">
-        <header class="topbar">
-          <div class="model-summary">
-            <span class="model-mark" aria-hidden="true">C</span>
-            <span class="model-copy">
-              <strong>Cela.sh Reader</strong>
-              <small id="model">جارٍ فحص النموذج</small>
-            </span>
-            <span class="model-chevron" aria-hidden="true">⌄</span>
+      <main class="main-panel" dir="rtl">
+        <header class="main-toolbar">
+          <div class="workspace-title">
+            <span class="workspace-kicker"
+              >مساحة العمل <span class="crumb-dot">/</span> Cela Reader</span
+            >
+            <h1>قراءة الويب العام</h1>
           </div>
-          <div class="topbar-actions">
+          <div class="main-toolbar-actions">
+            <button
+              id="mobile-nav-toggle"
+              class="icon-button nav-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="sidebar"
+              aria-label="إظهار قائمة التنقل"
+            >
+              <span class="icon icon-panel-left" aria-hidden="true"></span>
+            </button>
+            <span id="model" class="model-label" title="المزوّد والنموذج"
+              >جارٍ فحص النموذج</span
+            >
             <span class="read-mode">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="m12 3 7 3v5c0 4.5-2.7 7.9-7 10-4.3-2.1-7-5.5-7-10V6l7-3Z"
-                />
-              </svg>
-              قراءة عامة فقط
+              <span class="icon icon-shield-check" aria-hidden="true"></span>
+              قراءة فقط
             </span>
             <span id="service-pill" class="service-pill offline"
               >جارٍ فحص الخدمة</span
             >
-            <button id="logout" class="logout-button" hidden>خروج آمن</button>
+            <button id="logout" class="logout-button" type="button" hidden>
+              <span class="icon icon-lock-keyhole" aria-hidden="true"></span>
+              خروج آمن
+            </button>
+            <button
+              id="mobile-runtime-toggle"
+              class="icon-button runtime-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="execution-panel"
+              aria-label="إظهار لوحة التنفيذ"
+            >
+              <span class="icon icon-terminal" aria-hidden="true"></span>
+            </button>
           </div>
         </header>
         <p id="config" class="config-notice" hidden></p>
 
-        <section class="workspace" aria-label="المحادثة">
+        <section class="workspace" aria-label="محادثة قراءة الويب">
           <div id="empty-state" class="empty-state">
             <div class="hero">
-              <div class="hero-orbit" aria-hidden="true">
-                <span>C</span>
+              <div class="hero-copy">
+                <span class="hero-eyebrow"
+                  ><span class="icon icon-sparkles" aria-hidden="true"></span>
+                  مساعد Cela للقراءة الآمنة</span
+                >
+                <h2>ما الذي تريد قراءته اليوم؟</h2>
+                <p>
+                  أرسل رابطًا عامًا أو موضوعًا للبحث. راجع الخطة أولًا؛ ولا يبدأ
+                  المتصفح قبل موافقتك.
+                </p>
               </div>
-              <div class="hero-kicker">مساحة Cela.sh</div>
-              <h1>ما الذي تريد قراءته اليوم؟</h1>
-              <p>
-                افتح صفحة عامة أو ابحث عن موضوع. راجع الخطة قبل التشغيل، وستبقى
-                كل خطوة للقراءة فقط.
-              </p>
+              <div class="hero-mark" aria-hidden="true">
+                <span class="hero-ring hero-ring-one"></span>
+                <span class="hero-ring hero-ring-two"></span>
+                <span class="hero-core">C</span>
+              </div>
             </div>
-            <div class="feature-grid" aria-label="طرق البدء">
+
+            <div class="quick-start" aria-label="طرق البدء">
+              <div class="quick-start-heading">
+                <span>ابدأ بمهمة</span>
+                <small>اقتراحات آمنة للقراءة</small>
+              </div>
               <button
-                class="feature-card"
+                class="quick-card"
                 data-task="افتح https://example.com واقرأ عنوان الصفحة"
                 type="button"
               >
-                <span class="feature-icon link-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="m10 13 4-4" />
-                    <path
-                      d="M8.5 15.5 7 17a4 4 0 0 1-5.7-5.7l4-4A4 4 0 0 1 11 7"
-                    />
-                    <path
-                      d="m15.5 8.5 1.5-1.5a4 4 0 0 1 5.7 5.7l-4 4A4 4 0 0 1 13 17"
-                    />
-                  </svg>
-                </span>
-                <span class="feature-copy">
-                  <strong>قراءة رابط مباشر</strong>
-                  <small>عنوان الصفحة ونصها الظاهر</small>
-                </span>
-                <span class="feature-arrow" aria-hidden="true">↗</span>
+                <span class="quick-icon"
+                  ><span class="icon icon-globe" aria-hidden="true"></span
+                ></span>
+                <span class="quick-card-copy"
+                  ><strong>قراءة رابط مباشر</strong
+                  ><small>عنوان الصفحة ونصها الظاهر</small></span
+                >
+                <span
+                  class="icon icon-external-link quick-arrow"
+                  aria-hidden="true"
+                ></span>
               </button>
               <button
-                class="feature-card"
+                class="quick-card"
                 data-task="ابحث عن وثائق Cloudflare Workers AI"
                 type="button"
               >
-                <span class="feature-icon search-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <circle cx="10.8" cy="10.8" r="6.8" />
-                    <path d="m16 16 5 5" />
-                  </svg>
-                </span>
-                <span class="feature-copy">
-                  <strong>بحث في موضوع</strong>
-                  <small>استكشاف صفحات عامة ومراجعة الخطة</small>
-                </span>
-                <span class="feature-arrow" aria-hidden="true">↗</span>
+                <span class="quick-icon quick-icon-violet"
+                  ><span class="icon icon-search" aria-hidden="true"></span
+                ></span>
+                <span class="quick-card-copy"
+                  ><strong>بحث في موضوع</strong
+                  ><small>استكشاف صفحات عامة ومراجعة الخطة</small></span
+                >
+                <span
+                  class="icon icon-external-link quick-arrow"
+                  aria-hidden="true"
+                ></span>
               </button>
-              <section id="safety-card" class="feature-card safety-card">
-                <span class="feature-icon safety-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="m12 3 7 3v5c0 4.5-2.7 7.9-7 10-4.3-2.1-7-5.5-7-10V6l7-3Z"
-                    />
-                    <path d="m9 12 2 2 4-4" />
-                  </svg>
-                </span>
-                <span class="feature-copy">
-                  <strong>حدود واضحة</strong>
-                  <small
-                    >لا تسجيل دخول أو نقر أو إرسال أو تعديل. تتوقف المهمة عند حد
-                    الاستخدام.</small
-                  >
-                </span>
-                <span class="safety-caption">خصوصية أولًا</span>
-              </section>
+              <div class="guardrail-card">
+                <span class="guardrail-icon"
+                  ><span
+                    class="icon icon-shield-check"
+                    aria-hidden="true"
+                  ></span
+                ></span>
+                <span
+                  ><strong>حدود واضحة</strong
+                  ><small
+                    >لا تسجيل دخول أو نقر أو إرسال أو تعديل. نقرأ صفحات HTTPS
+                    العامة فقط.</small
+                  ></span
+                >
+                <span class="guardrail-badge">خصوصية أولًا</span>
+              </div>
             </div>
+
+            <details class="mock-chat-sample">
+              <summary>
+                <span class="sample-tag">DEMO</span> مثال محادثة ثابت — ليس
+                سجلًا فعليًا
+              </summary>
+              <div class="sample-chat-bubble">
+                The app is live, but the read flow still does not pass.
+                Password: I did not test the updated password. The My Browser
+                session was already authenticated...
+              </div>
+            </details>
           </div>
 
           <div id="thread" class="thread" aria-live="polite"></div>
 
           <form id="composer" class="composer">
-            <label class="composer-label" for="task"
-              >ما المهمة التي تريد تنفيذها؟</label
-            >
+            <div class="composer-heading">
+              <label class="composer-label" for="task"
+                >ما المهمة التي تريد تنفيذها؟</label
+              >
+              <span class="composer-context"
+                ><span class="icon icon-lock-keyhole" aria-hidden="true"></span>
+                لا تُدخل كلمات مرور أو أسرارًا</span
+              >
+            </div>
             <textarea
               id="task"
               maxlength="2000"
               aria-label="مهمة البحث"
-              placeholder="اكتب رابطًا عامًا لقراءته أو موضوعًا للبحث عنه..."
+              placeholder="اكتب رابط HTTPS عامًا أو موضوعًا للبحث..."
               required
             ></textarea>
             <div class="composer-bottom">
-              <div class="composer-hints">
+              <div class="composer-tools">
+                <button
+                  class="composer-tool"
+                  type="button"
+                  disabled
+                  aria-label="إرفاق ملف غير متاح"
+                  title="غير متاح حاليًا"
+                >
+                  <span class="icon icon-paperclip" aria-hidden="true"></span>
+                </button>
+                <button
+                  class="composer-tool"
+                  type="button"
+                  disabled
+                  aria-label="الإملاء الصوتي غير متاح"
+                  title="غير متاح حاليًا"
+                >
+                  <span class="icon icon-mic" aria-hidden="true"></span>
+                </button>
                 <span class="hint-chip">HTTPS فقط</span>
                 <span class="hint-chip">قراءة بلا تفاعل</span>
-                <small
-                  >لا تكتب كلمات مرور أو أسرارًا، ولا تفتح رابطًا يُحدث تغييرًا
-                  عند تحميله.</small
-                >
               </div>
-              <button id="send" class="send" aria-label="أنشئ خطة">↑</button>
+              <button
+                id="send"
+                class="send-button"
+                type="submit"
+                aria-label="أنشئ خطة"
+              >
+                <span class="icon icon-arrow-up" aria-hidden="true"></span>
+              </button>
             </div>
           </form>
           <p id="safety-note" class="workspace-footer">
-            تُحفظ المحادثة في هذا المتصفح فقط. لا ينفّذ Cela.sh تسجيل الدخول
-            للمواقع أو أي إجراء يغيّر بياناتها.
+            <span class="icon icon-shield-check" aria-hidden="true"></span>
+            تُحفظ المحادثة في هذا المتصفح فقط. لا يسجّل Cela الدخول إلى المواقع
+            ولا ينفّذ إجراءات تغيّر بياناتها.
           </p>
         </section>
       </main>
+
+      <aside
+        id="execution-panel"
+        class="execution-panel"
+        aria-label="لوحة التنفيذ"
+        dir="ltr"
+      >
+        <header class="execution-header">
+          <div class="execution-title-lockup">
+            <span class="execution-mark" aria-hidden="true"
+              ><span class="icon icon-terminal"></span
+            ></span>
+            <span
+              ><strong>Cela runtime</strong
+              ><small>سجل الخطة والتنفيذ</small></span
+            >
+          </div>
+          <span class="live-indicator"><i></i> LIVE</span>
+        </header>
+
+        <div class="execution-body">
+          <section class="runtime-overview" aria-live="polite">
+            <div class="runtime-status-row">
+              <span class="runtime-status-dot"></span>
+              <strong id="runtime-state">جاهز لاستقبال مهمة</strong>
+              <span class="runtime-version">READ ONLY</span>
+            </div>
+            <p id="runtime-summary">
+              تظهر هنا تفاصيل الطلب والخطة ونتيجة القراءة الفعلية.
+            </p>
+          </section>
+
+          <section class="runtime-section">
+            <div class="runtime-section-heading">
+              <span>Request payload</span>
+              <span id="runtime-method" class="method-chip">IDLE</span>
+            </div>
+            <pre id="runtime-request" class="code-panel">
+{
+  "task": "waiting for a public page request"
+}</pre>
+          </section>
+
+          <section class="runtime-section flow-section">
+            <div class="runtime-section-heading">
+              <span>Execution path</span
+              ><span class="muted-code">3 stages</span>
+            </div>
+            <div class="trace-step" id="planner-step">
+              <span class="trace-step-icon"
+                ><span class="icon icon-bot" aria-hidden="true"></span
+              ></span>
+              <span class="trace-step-copy"
+                ><strong>Plan request</strong
+                ><small id="planner-step-state">بانتظار مهمة</small></span
+              >
+              <span class="trace-index">01</span>
+            </div>
+            <div class="trace-step" id="safety-step">
+              <span class="trace-step-icon"
+                ><span class="icon icon-shield-check" aria-hidden="true"></span
+              ></span>
+              <span class="trace-step-copy"
+                ><strong>Safety review</strong
+                ><small id="safety-step-state">لم تبدأ</small></span
+              >
+              <span class="trace-index">02</span>
+            </div>
+            <div class="trace-step" id="browser-step">
+              <span class="trace-step-icon"
+                ><span class="icon icon-globe" aria-hidden="true"></span
+              ></span>
+              <span class="trace-step-copy"
+                ><strong>Browser Run</strong
+                ><small id="browser-step-state">لم يبدأ</small></span
+              >
+              <span class="trace-index">03</span>
+            </div>
+          </section>
+
+          <section class="runtime-section runtime-output-section">
+            <div class="runtime-section-heading">
+              <span id="runtime-output-label">Plan target / result</span>
+              <span id="runtime-output-badge" class="output-badge">EMPTY</span>
+            </div>
+            <div id="runtime-target" class="runtime-target">
+              لا توجد مهمة حاليًا.
+            </div>
+            <p id="runtime-outcome" class="runtime-outcome">
+              لن يبدأ Browser Run قبل مراجعة الخطة والموافقة عليها.
+            </p>
+          </section>
+
+          <details id="demo-trace" class="demo-trace">
+            <summary>
+              <span class="sample-tag">MOCK</span> مثال سجل ثابت
+            </summary>
+            <p class="demo-disclaimer">
+              بيانات توضيحية فقط — ليست استدعاء أداة أو نتيجة حقيقية.
+            </p>
+            <div class="demo-code-heading">
+              <span>tool.call · browser_switch</span><span>JSON</span>
+            </div>
+            <pre class="code-panel demo-code">
+{
+  "brief": "Restore the isolated browser route after testing in the pre-existing authenticated session.",
+  "target": "sandbox"
+}</pre>
+            <div class="demo-result">
+              <span class="icon icon-circle-check" aria-hidden="true"></span
+              ><span
+                >[Browser: Sandbox] Browser routing switched to the isolated
+                sandbox browser.</span
+              >
+            </div>
+            <div class="demo-controls" aria-label="عناصر تحكم المثال التوضيحي">
+              <span class="demo-live"><i></i> SAMPLE</span>
+              <button id="demo-rewind" type="button" aria-label="إرجاع المثال">
+                <span class="icon icon-rewind" aria-hidden="true"></span>
+              </button>
+              <button id="demo-play" type="button" aria-label="تشغيل المثال">
+                <span class="icon icon-play" aria-hidden="true"></span>
+              </button>
+              <button id="demo-forward" type="button" aria-label="تقديم المثال">
+                <span class="icon icon-fast-forward" aria-hidden="true"></span>
+              </button>
+              <div
+                class="demo-progress"
+                role="progressbar"
+                aria-label="تقدم المثال"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow="24"
+              >
+                <span id="demo-progress-fill"></span>
+              </div>
+              <span id="demo-progress-text" class="demo-progress-text"
+                >24%</span
+              >
+            </div>
+          </details>
+        </div>
+
+        <footer class="execution-footer">
+          <span class="footer-safe-dot"></span>
+          <span>لا تُعرض رموز الجلسة أو الأسرار في السجل.</span>
+          <button
+            class="icon-button execution-settings"
+            type="button"
+            disabled
+            aria-label="إعدادات السجل قريبًا"
+            title="قريبًا"
+          >
+            <span class="icon icon-settings-2" aria-hidden="true"></span>
+          </button>
+        </footer>
+      </aside>
     </div>
+
     <div id="login-layer" class="overlay" hidden>
-      <form id="login-form" class="dialog">
+      <form id="login-form" class="dialog" dir="rtl">
         <span class="login-mark" aria-hidden="true">C</span>
-        <span class="eyebrow">Cela.sh</span>
+        <span class="eyebrow">Cela.sh · دخول آمن</span>
         <h2>أهلًا بك في مساحتك</h2>
         <p>أدخل كلمة مرور الوصول التي أعدّها مالك الخدمة.</p>
+        <label for="password">كلمة مرور الوصول</label>
         <input
           id="password"
           type="password"
@@ -226,8 +623,12 @@
         />
         <button class="primary" type="submit">دخول آمن</button>
         <p id="login-error" class="bad" role="alert"></p>
+        <small class="login-footnote"
+          >لا تُرسل كلمة المرور أو تحفظها في المحادثة.</small
+        >
       </form>
     </div>
+
     <script type="module">
       const thread = document.querySelector("#thread");
       const form = document.querySelector("#composer");
@@ -241,6 +642,7 @@
       let busy = false;
       let controller;
       let messages = [];
+
       try {
         const currentHistory = localStorage.getItem(STORAGE_KEY);
         const legacyHistory = currentHistory
@@ -268,6 +670,7 @@
         if (text !== undefined) node.textContent = text;
         return node;
       }
+
       function persist() {
         try {
           localStorage.setItem(
@@ -276,6 +679,7 @@
           );
         } catch {}
       }
+
       function renderHistory() {
         const recent = messages
           .filter((item) => item.role === "user")
@@ -300,28 +704,164 @@
           historyList.append(button);
         }
       }
+
+      function setTraceStep(id, status, stateClass = "") {
+        const step = document.querySelector(`#${id}`);
+        step.classList.toggle("is-done", stateClass === "done");
+        step.classList.toggle("is-active", stateClass === "active");
+        step.classList.toggle("is-blocked", stateClass === "blocked");
+        step.classList.toggle("is-error", stateClass === "error");
+        document.querySelector(`#${id}-state`).textContent = status;
+      }
+
+      function renderRuntime() {
+        const latestUser = [...messages]
+          .reverse()
+          .find((item) => item.role === "user");
+        const latestAssistant = [...messages]
+          .reverse()
+          .find((item) => item.role === "assistant");
+        const hasPlan = Boolean(latestAssistant?.plan);
+        const result = latestAssistant?.result;
+        const hasResult = Boolean(result);
+        const hasError = Boolean(latestAssistant?.error || result?.error);
+        const requestBox = document.querySelector("#runtime-request");
+        const runtimeState = document.querySelector("#runtime-state");
+        const runtimeSummary = document.querySelector("#runtime-summary");
+        const runtimeTarget = document.querySelector("#runtime-target");
+        const runtimeOutcome = document.querySelector("#runtime-outcome");
+        const outputBadge = document.querySelector("#runtime-output-badge");
+        const method = document.querySelector("#runtime-method");
+
+        requestBox.textContent = latestUser
+          ? JSON.stringify({ task: latestUser.content }, null, 2)
+          : '{\n  "task": "waiting for a public page request"\n}';
+        method.textContent = latestUser ? "POST /api/plan" : "IDLE";
+        runtimeTarget.textContent = "لا توجد مهمة حاليًا.";
+        runtimeOutcome.textContent =
+          "لن يبدأ Browser Run قبل مراجعة الخطة والموافقة عليها.";
+        outputBadge.textContent = "EMPTY";
+        document.querySelector("#runtime-output-label").textContent =
+          "Plan target / result";
+
+        if (!latestUser) {
+          runtimeState.textContent = "جاهز لاستقبال مهمة";
+          runtimeSummary.textContent =
+            "تظهر هنا تفاصيل الطلب والخطة ونتيجة القراءة الفعلية.";
+          setTraceStep("planner-step", "بانتظار مهمة", "");
+          setTraceStep("safety-step", "لم تبدأ", "");
+          setTraceStep("browser-step", "لم يبدأ", "");
+          return;
+        }
+
+        if (busy && !hasPlan) {
+          runtimeState.textContent = "جارٍ إنشاء الخطة";
+          runtimeSummary.textContent =
+            "لم يبدأ Browser Run؛ الطلب قيد المراجعة الآلية.";
+          setTraceStep("planner-step", "قيد التنفيذ", "active");
+          setTraceStep("safety-step", "بانتظار مخرجات الخطة", "");
+          setTraceStep("browser-step", "لم يبدأ", "");
+        } else if (hasError && !hasPlan) {
+          runtimeState.textContent = "توقفت قبل التشغيل";
+          runtimeSummary.textContent = "تعذر اعتماد خطة آمنة. لم يبدأ المتصفح.";
+          setTraceStep("planner-step", "لم ينتج مخططًا صالحًا", "error");
+          setTraceStep("safety-step", "محظور", "blocked");
+          setTraceStep("browser-step", "لم يبدأ", "");
+          runtimeOutcome.textContent =
+            latestAssistant?.content || result?.error || "تعذر إكمال الطلب.";
+          outputBadge.textContent = "BLOCKED";
+        } else if (hasPlan && busy) {
+          runtimeState.textContent = "جارٍ تنفيذ قراءة عامة";
+          runtimeSummary.textContent =
+            "بدأ التنفيذ بعد تأكيد الخطة في الواجهة.";
+          setTraceStep("planner-step", "خطة جاهزة", "done");
+          setTraceStep("safety-step", "تمت المراجعة", "done");
+          setTraceStep("browser-step", "جارٍ التشغيل", "active");
+        } else if (hasPlan && !hasResult) {
+          runtimeState.textContent = "الخطة بانتظار موافقتك";
+          runtimeSummary.textContent =
+            "تحقق من عنوان الوجهة قبل بدء Browser Run.";
+          setTraceStep("planner-step", "اكتملت الخطة", "done");
+          setTraceStep("safety-step", "مراجعة المستخدم مطلوبة", "active");
+          setTraceStep("browser-step", "لم يبدأ", "");
+          runtimeTarget.textContent =
+            latestAssistant.plan.action === "search"
+              ? `بحث عام: ${latestAssistant.plan.query}`
+              : latestAssistant.plan.url;
+          runtimeOutcome.textContent =
+            "لم يبدأ Browser Run. راجع الخطة في المحادثة قبل الموافقة.";
+          outputBadge.textContent = "REVIEW";
+        } else if (hasResult && hasError) {
+          runtimeState.textContent = "توقفت المهمة بأمان";
+          runtimeSummary.textContent = "أوقفت الحماية المهمة قبل إكمالها.";
+          setTraceStep("planner-step", "اكتملت الخطة", "done");
+          setTraceStep("safety-step", "تمت المراجعة", "done");
+          setTraceStep("browser-step", "توقف مع خطأ", "error");
+          runtimeOutcome.textContent =
+            result.error || "تعذر تنفيذ القراءة بأمان.";
+          outputBadge.textContent = "STOPPED";
+        } else if (hasResult) {
+          runtimeState.textContent = "اكتملت القراءة";
+          runtimeSummary.textContent =
+            "انتهى Browser Run؛ راجع الملخص والدليل في المحادثة.";
+          setTraceStep("planner-step", "اكتملت الخطة", "done");
+          setTraceStep("safety-step", "تمت المراجعة", "done");
+          setTraceStep("browser-step", "اكتمل", "done");
+          runtimeOutcome.textContent =
+            result.answer || "اكتملت القراءة العامة.";
+          outputBadge.textContent = "DONE";
+        }
+
+        if (hasPlan) {
+          method.textContent = "POST /api/plan → /api/execute";
+          document.querySelector("#runtime-output-label").textContent =
+            "Plan target / result";
+          runtimeTarget.textContent =
+            latestAssistant.plan.action === "search"
+              ? `بحث عام: ${latestAssistant.plan.query}`
+              : latestAssistant.plan.url;
+          outputBadge.textContent = hasResult
+            ? hasError
+              ? "STOPPED"
+              : "DONE"
+            : "REVIEW";
+          if (hasResult)
+            runtimeOutcome.textContent =
+              result.answer || result.error || "انتهت المهمة.";
+        }
+      }
+
       function setBusy(value, stopped = false) {
         busy = value;
         sendButton.disabled = value;
-        sendButton.textContent = value ? "…" : "↑";
-        document.querySelector("#service-pill").textContent = value
+        sendButton.setAttribute("aria-busy", String(value));
+        sendButton.innerHTML = value
+          ? '<span class="spinner" aria-hidden="true"></span>'
+          : '<span class="icon icon-arrow-up" aria-hidden="true"></span>';
+        const pill = document.querySelector("#service-pill");
+        pill.textContent = value
           ? "المهمة قيد التنفيذ"
           : stopped
             ? "توقفت المهمة"
-            : "الخدمة جاهزة";
-        document.querySelector("#service-pill").className =
-          `service-pill${stopped ? " offline" : ""}`;
+            : "الخدمات مهيأة";
+        pill.className = `service-pill${stopped ? " offline" : ""}${value ? " working" : ""}`;
       }
+
       function render() {
         thread.replaceChildren();
         emptyState.hidden = messages.length > 0;
         renderHistory();
         for (const message of messages) {
           const card = el("article", `message ${message.role}`);
-          card.append(
-            el("div", "label", message.role === "user" ? "أنت" : "Cela.sh"),
+          const label = el(
+            "div",
+            "message-label",
+            message.role === "user" ? "أنت" : "Cela.sh",
           );
-          card.append(el("div", "content", message.content || "جارٍ العمل..."));
+          card.append(
+            label,
+            el("div", "content", message.content || "جارٍ العمل..."),
+          );
           if (message.plan) {
             const plan = el("section", "plan");
             plan.append(el("h3", "", "خطة مقترحة للمراجعة"));
@@ -346,14 +886,14 @@
             const row = el("div", "action-row");
             let approved = false;
             if (message.plan.requiresConfirmation) {
-              const label = el("label", "confirm-line");
+              const confirmLabel = el("label", "confirm-line");
               const checkbox = document.createElement("input");
               checkbox.type = "checkbox";
               checkbox.addEventListener("change", () => {
                 approved = checkbox.checked;
                 button.disabled = !approved || busy;
               });
-              label.append(
+              confirmLabel.append(
                 checkbox,
                 el(
                   "span",
@@ -361,7 +901,7 @@
                   "أؤكد أن التنفيذ للقراءة العامة فقط، دون إرسال أو تغيير.",
                 ),
               );
-              plan.append(label);
+              plan.append(confirmLabel);
             }
             const button = el(
               "button",
@@ -383,9 +923,9 @@
             card.append(plan);
           }
           if (message.result) {
-            const result = el("section", "result");
-            result.append(el("h3", "", "النتيجة"));
-            result.append(
+            const resultCard = el("section", "result");
+            resultCard.append(el("h3", "", "النتيجة"));
+            resultCard.append(
               el(
                 "p",
                 "",
@@ -398,7 +938,7 @@
               const list = el("ol", "steps");
               for (const step of message.result.steps)
                 list.append(el("li", "", step));
-              result.append(list);
+              resultCard.append(list);
             }
             if (message.result.evidence) {
               const evidence = el("div", "evidence");
@@ -415,26 +955,29 @@
                   el(
                     "p",
                     "meta",
-                    `الميزانية المحجوزة للمحاولة: حتى ${Math.round(message.result.evidence.reservedBrowserMs / 1000)} ثانية (حد محافظ، ليس قياسًا فعليًا)`,
+                    `ميزانية القراءة المحجوزة: حتى ${Math.round(message.result.evidence.reservedBrowserMs / 1000)} ثانية.`,
                   ),
                 );
               evidence.append(
                 el("blockquote", "", message.result.evidence.excerpt || ""),
               );
-              result.append(evidence);
+              resultCard.append(evidence);
             }
-            card.append(result);
+            card.append(resultCard);
           }
           thread.append(card);
         }
         thread.scrollTop = thread.scrollHeight;
+        renderRuntime();
         persist();
       }
+
       function setActiveNav(id) {
         document.querySelectorAll(".nav-item").forEach((item) => {
           item.classList.toggle("active", item.id === id);
         });
       }
+
       async function requestJson(path, payload, signal) {
         const response = await fetch(path, {
           method: "POST",
@@ -452,6 +995,7 @@
           );
         return result;
       }
+
       async function makePlan(value) {
         if (busy) return;
         const task = value.trim();
@@ -490,6 +1034,7 @@
           render();
         }
       }
+
       async function runPlan(id, button, confirmed) {
         const token = activeTokens.get(id);
         if (!token || busy) return;
@@ -522,8 +1067,28 @@
           render();
         }
       }
+
+      function setActiveBrowserTab(index) {
+        document
+          .querySelectorAll(".chrome-tab[role='tab']")
+          .forEach((tab, i) => {
+            const selected = i === index;
+            tab.classList.toggle("active", selected);
+            tab.setAttribute("aria-selected", String(selected));
+          });
+      }
+
+      function closeMobileNavigation() {
+        document.querySelector("#app-shell").classList.remove("nav-open");
+        document
+          .querySelector("#mobile-nav-toggle")
+          .setAttribute("aria-expanded", "false");
+      }
+
       document.querySelector("#new-task-nav").addEventListener("click", () => {
         setActiveNav("new-task-nav");
+        setActiveBrowserTab(0);
+        closeMobileNavigation();
         document
           .querySelector("#composer")
           .scrollIntoView({ behavior: "smooth", block: "center" });
@@ -531,15 +1096,30 @@
       });
       document.querySelector("#history-nav").addEventListener("click", () => {
         setActiveNav("history-nav");
+        setActiveBrowserTab(1);
+        closeMobileNavigation();
         document
           .querySelector("#recent-section")
           .scrollIntoView({ behavior: "smooth", block: "center" });
       });
       document.querySelector("#safety-nav").addEventListener("click", () => {
         setActiveNav("safety-nav");
+        closeMobileNavigation();
         document
           .querySelector("#safety-note")
           .scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      document.querySelector("#activity-tab").addEventListener("click", () => {
+        document.querySelector("#history-nav").click();
+      });
+      window.addEventListener("keydown", (event) => {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          event.key.toLowerCase() === "k"
+        ) {
+          event.preventDefault();
+          document.querySelector("#new-task-nav").click();
+        }
       });
       document.querySelectorAll("[data-task]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -575,8 +1155,97 @@
           location.reload();
         }
       });
+      document
+        .querySelector("#browser-reload")
+        .addEventListener("click", () => location.reload());
+      document
+        .querySelector("#copy-origin")
+        .addEventListener("click", async () => {
+          const button = document.querySelector("#copy-origin");
+          try {
+            await navigator.clipboard.writeText(location.origin);
+            button.title = "تم نسخ عنوان التطبيق";
+          } catch {
+            button.title = location.origin;
+          }
+        });
+      document
+        .querySelector("#mobile-runtime-toggle")
+        .addEventListener("click", (event) => {
+          const shell = document.querySelector("#app-shell");
+          const open = shell.classList.toggle("runtime-open");
+          if (open) closeMobileNavigation();
+          event.currentTarget.setAttribute("aria-expanded", String(open));
+        });
+      document
+        .querySelector("#mobile-nav-toggle")
+        .addEventListener("click", (event) => {
+          const shell = document.querySelector("#app-shell");
+          const open = shell.classList.toggle("nav-open");
+          if (open) {
+            shell.classList.remove("runtime-open");
+            document
+              .querySelector("#mobile-runtime-toggle")
+              .setAttribute("aria-expanded", "false");
+          }
+          event.currentTarget.setAttribute("aria-expanded", String(open));
+        });
+      document.addEventListener("click", (event) => {
+        const shell = document.querySelector("#app-shell");
+        if (
+          shell.classList.contains("nav-open") &&
+          !event.target.closest("#sidebar") &&
+          !event.target.closest("#mobile-nav-toggle")
+        ) {
+          closeMobileNavigation();
+        }
+      });
+
+      let demoProgress = 24;
+      let demoTimer = null;
+      const progressFill = document.querySelector("#demo-progress-fill");
+      const progressBar = document.querySelector(".demo-progress");
+      const progressText = document.querySelector("#demo-progress-text");
+      const playButton = document.querySelector("#demo-play");
+      function updateDemoProgress(value) {
+        demoProgress = Math.max(0, Math.min(100, value));
+        progressFill.style.width = `${demoProgress}%`;
+        progressBar.setAttribute("aria-valuenow", String(demoProgress));
+        progressText.textContent = `${demoProgress}%`;
+      }
+      function stopDemo() {
+        window.clearInterval(demoTimer);
+        demoTimer = null;
+        playButton.innerHTML =
+          '<span class="icon icon-play" aria-hidden="true"></span>';
+        playButton.setAttribute("aria-label", "تشغيل المثال");
+      }
+      document
+        .querySelector("#demo-rewind")
+        .addEventListener("click", () => updateDemoProgress(demoProgress - 20));
+      document
+        .querySelector("#demo-forward")
+        .addEventListener("click", () => updateDemoProgress(demoProgress + 20));
+      playButton.addEventListener("click", () => {
+        if (demoTimer) {
+          stopDemo();
+          return;
+        }
+        playButton.innerHTML =
+          '<span class="icon icon-pause" aria-hidden="true"></span>';
+        playButton.setAttribute("aria-label", "إيقاف المثال");
+        demoTimer = window.setInterval(() => {
+          if (demoProgress >= 100) {
+            updateDemoProgress(0);
+          } else {
+            updateDemoProgress(demoProgress + 4);
+          }
+        }, 450);
+      });
+
       async function initialize() {
         render();
+        document.querySelector("#origin-label").textContent = location.host;
         try {
           const status = await fetch("/api/status", { cache: "no-store" }).then(
             (response) => response.json(),
@@ -605,11 +1274,13 @@
         } catch {
           document.querySelector("#service-pill").textContent =
             "الخدمة غير متاحة";
+          document.querySelector("#model").textContent = "غير متاح";
           document.querySelector("#config").hidden = false;
           document.querySelector("#config").textContent =
             "تعذر فحص الخدمات. لم يبدأ أي تنفيذ.";
         }
       }
+
       render();
       initialize();
     </script>
