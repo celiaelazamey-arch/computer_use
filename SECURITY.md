@@ -49,7 +49,7 @@ The maintainer will acknowledge reports and coordinate a reasonable fix and disc
 
 | Version        | Supported |
 | -------------- | --------- |
-| 1.0.0 (`main`) | Yes       |
+| 1.0.1 (`main`) | Yes       |
 
 `main` is the only development line. There is no backport branch and no legacy compatibility window: a fix lands on `main` and superseded behavior is removed rather than deprecated.
 

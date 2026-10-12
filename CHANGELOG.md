@@ -1,16 +1,23 @@
 # Changelog
 
-This project keeps **one current version** and no historical release line. `main` is the only development branch: superseded behavior is removed rather than deprecated, and there are no backports. The version string is identical in `pyproject.toml`, `ccelia2027/package.json`, `docs/architecture.md`, and `docs/protocol.md`.
+This project keeps **one current version** and no historical release line. `main` is the only development branch: superseded behavior is removed rather than deprecated, and there are no backports. The current version is tagged on `main` at the merge commit of the release.
 
-## Unreleased
+The version string is identical in **six** places, and `tests/test_version_consistency.py` fails the build when they drift: `pyproject.toml`, `ccelia2027/package.json`, `docs/architecture.md`, `docs/protocol.md`, `SECURITY.md` (supported-versions table), and `src/cela_sh/server.py` (the FastAPI `version=`, which is published to callers through `/openapi.json` and `/docs`). Bumping only the first four leaves the public OpenAPI contract advertising a stale version.
+
+## 1.0.1
 
 ### Security
 
-- `cela.sh`: the local API answers every failure with a code and a fixed sentence only. Unexpected exceptions now return `500` with `{"error":{"code":"internal_error","message":"Internal server error."}}` instead of the exception text, the planner and memory handlers keep their sanitized `502`/`503`/`422` messages, and the traceback is written to the server log rather than to the caller.
+- `cela.sh`: the local API answers every **application** failure with a code and a fixed sentence only. Unexpected exceptions now return `500` with `{"error":{"code":"internal_error","message":"Internal server error."}}` instead of the exception text, the planner and memory handlers keep their sanitized `502`/`503`/`422` messages, and the traceback is written to the server log rather than to the caller. Request-body validation and routing failures are answered by FastAPI itself with the standard `{"detail": ...}` envelope, so the API has two response shapes; `docs/api-errors.md` records both.
 - `cela.sh`: `sudo`, privilege-escalation tools (`doas`, `pkexec`, `su -`), shell commands (`rm -rf`, `bash -c`, `powershell -`, `cmd /c`, `chmod`, `chown`), and shell targets (`terminal`, `PowerShell`, `الطرفية`, `سطر الأوامر`) are now blocked uniformly across all action types (`TYPE`, `SEARCH_WEB`, `NAVIGATE`, `CLICK`, `OPEN_APP`, `OBSERVE`, `SCROLL`, `WAIT`, `ASK_USER`, `STOP`) and in the goal text, returning `status: blocked` with explicit guidance to run intended system commands manually in the user's own terminal.
 - `cela.sh`: extracted the abstract `Planner` interface (`cela_sh.planner.base`) and local planner provider registry (`register_planner_provider`, `build_planner`, `CELA_PLANNER_PROVIDER`) with shared `PlannerContract` enforcement, keeping `OllamaPlanner` as the default strictly local provider.
 - `cela.sh`: consequential verbs (send, submit, post, publish, upload, email, reply, share, message, order, checkout, subscribe, and their Arabic equivalents) now require confirmation instead of returning `ready` with `low` risk. Classification applies to the goal and to each step.
 - `ccelia2027`: each plan token can be executed once. Replays return 409 `plan_already_used` before any browser starts. Plan tokens issued before this change have no `jti` and are rejected. For a short window during deploy, users with unexpired old-format tokens get a 400 and must create a new plan.
+
+### Documentation
+
+- Added `docs/api-errors.md` as the **single reference** for the local API error contract: every application code with its status and fixed sentence, the framework's separate `{"detail": ...}` envelope, the input limits, what is never returned, and a re-verification appendix. Every row was confirmed against the running application rather than read from source. `README.md` and `docs/docker-deployment.md` now link to it instead of restating the tables, so the contract cannot drift between two copies.
+- Corrected the version-string inventory above from four locations to six, and added `tests/test_version_consistency.py` to enforce it.
 
 ## 1.0.0
 
