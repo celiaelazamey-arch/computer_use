@@ -1,12 +1,11 @@
-import ipaddress
 import json
 import logging
-from urllib.parse import urlparse
 
 import requests
 from pydantic import ValidationError
 
 from ..memory import MemoryStore, MemoryStoreError
+from ..ollama_url import validate_ollama_url
 from .models import Plan, PlannerInput, RawPlan
 from .policy import apply_policy
 
@@ -55,22 +54,14 @@ class OllamaPlanner:
         memory_store: MemoryStore | None = None,
         memory_limit: int = 3,
         base_url: str = DEFAULT_OLLAMA_URL,
+        *,
+        allow_container_host: bool = False,
     ):
         if not model.strip():
             raise ValueError("model must not be blank")
         if isinstance(memory_limit, bool) or not isinstance(memory_limit, int) or memory_limit < 1:
             raise ValueError("memory_limit must be a positive integer")
-        parsed = urlparse(base_url)
-        if parsed.scheme != "http" or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("Ollama must use a local HTTP base URL")
-        if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
-            raise ValueError("Ollama base URL must not contain a path, query, or fragment")
-        try:
-            local_host = parsed.hostname == "localhost" or ipaddress.ip_address(parsed.hostname).is_loopback
-        except ValueError:
-            local_host = False
-        if not local_host:
-            raise ValueError("Ollama is restricted to loopback hosts")
+        validate_ollama_url(base_url, allow_container_host=allow_container_host)
 
         self.model = model
         self.timeout = timeout

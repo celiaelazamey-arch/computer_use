@@ -31,6 +31,18 @@ def _positive_int(name: str, default: int) -> int:
     return value
 
 
+def _boolean(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in ("true", "1"):
+        return True
+    if value in ("false", "0"):
+        return False
+    raise ConfigurationError(f"{name} must be true, false, 1, or 0.")
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     ollama_url: str = "http://127.0.0.1:11434"
@@ -44,8 +56,11 @@ class Settings:
     qdrant_api_key: str | None = None
     connect_timeout: float = 3.05
     read_timeout: float = 60.0
+    allow_ollama_container_host: bool = False
 
     def __post_init__(self) -> None:
+        if not isinstance(self.allow_ollama_container_host, bool):
+            raise ConfigurationError("CELA_ALLOW_OLLAMA_CONTAINER_HOST must be a boolean.")
         if not self.ollama_url.strip():
             raise ConfigurationError("CELA_OLLAMA_URL must not be blank.")
         if not self.planner_model.strip() or not self.embedding_model.strip():
@@ -94,4 +109,5 @@ class Settings:
             qdrant_api_key=api_key.strip() if api_key and api_key.strip() else None,
             connect_timeout=_positive_float("CELA_CONNECT_TIMEOUT", 3.05),
             read_timeout=_positive_float("CELA_READ_TIMEOUT", 60.0),
+            allow_ollama_container_host=_boolean("CELA_ALLOW_OLLAMA_CONTAINER_HOST"),
         )

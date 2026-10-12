@@ -2,7 +2,7 @@
 
 ## مخطط التخطيط المحلي cela.sh
 
-نظام تخطيط محلي قابل لإعادة الاستخدام: CLI موحدة، إعداد مركزي، وحقن اعتمادات اختياري لـ Ollama وQdrant. يستقبل هدفاً وسياقاً نصياً، ويتحقق من الخطة ويصنفها. لا يلتقط الشاشة ولا ينفذ النقرات أو الأوامر؛ كل مخرجاته `dry_run=true` و`execution_enabled=false`.
+نظام تخطيط محلي قابل لإعادة الاستخدام: CLI وAPI محلية، إعداد مركزي، وOllama مع ذاكرة اختيارية عبر `sqlite-vec` الرسمي أو Qdrant. يستقبل هدفاً وسياقاً نصياً، ويتحقق من الخطة ويصنفها. لا يلتقط الشاشة ولا ينفذ النقرات أو الأوامر؛ كل مخرجاته `dry_run=true` و`execution_enabled=false`.
 
 ## المستودع كنظام واحد
 
@@ -47,7 +47,18 @@ CELA_PLANNER_MODEL=qwen2.5:3b bash ./cela.sh probe
 
 ## الذاكرة والإعداد
 
-الذاكرة الدائمة معطلة افتراضياً. لتفعيل استرجاع Qdrant، عيّن المتغيرات في بيئة العملية:
+الذاكرة الدائمة معطلة افتراضياً في CLI/Python. لتفعيل SQLite المحلي مع امتداد `vec0` الحقيقي:
+
+```bash
+export CELA_MEMORY_BACKEND=sqlite-vec
+export CELA_SQLITE_VEC_PATH=cela_memory.db
+docker compose exec ollama ollama pull nomic-embed-text
+bash ./cela.sh --goal "تابع موضوع التخطيط" --session-id "جلسة-123"
+```
+
+يثبّت المشروع مكتبة `sqlite-vec` الرسمية. البحث cosine يتم داخل `vec0` باستخدام `MATCH`، مع ترشيح الجلسة قبل top-k. تُرحّل القواعد القديمة تلقائيًا بمعاملة ذرية دون إعادة embedding؛ **انسخها احتياطيًا قبل أول فتح بالإصدار الجديد**. راجع [دليل التخزين والترحيل](docs/docker-deployment.md#التخزين-والترحيل).
+
+لتفعيل استرجاع Qdrant بدلًا منه، عيّن المتغيرات في بيئة العملية:
 
 ```bash
 export CELA_MEMORY_BACKEND=qdrant
@@ -69,13 +80,28 @@ print(plan.model_dump_json(indent=2))
 
 `create_planner` هو نقطة التركيب: يجهز المحرك ويحقن مخزن الذاكرة المختار. يمكن حقن `MemoryStore` بديل مباشرةً في `OllamaPlanner` للاختبارات أو للتكاملات المستقبلية.
 
+## API والحاويات
+
+```bash
+bash ./cela.sh services-up-api
+docker compose exec ollama ollama pull qwen2.5:3b
+docker compose exec ollama ollama pull nomic-embed-text
+curl --fail http://127.0.0.1:8000/health
+```
+
+تشغّل خدمة `cela-sh-api` الاختيارية ضمن profile `api`، مع صورة متعددة المراحل ومستخدم غير root وvolume دائم للذاكرة. العقد في `/docs`؛ المسارات `/plan` و`/memory` و`/memory/search` تعيد التخطيط الجاف والذاكرة المعزولة فقط. الكتابة إلى الذاكرة صريحة، لا نتيجة جانبية للتخطيط.
+
+**لا توجد مصادقة API بعد**؛ Compose ينشر المنافذ على loopback فقط، و`session_id` ليس تفويضًا. `/health` لا يثبت تنزيل النماذج. التشغيل والإعداد والنسخ الاحتياطية والقيود في [دليل Docker](docs/docker-deployment.md).
+
 ## بنية المشروع
 
 - `cela.sh`: واجهة تشغيل موحدة للتثبيت والاختبار والخدمات والتخطيط وبوابة `preflight`.
+- `Dockerfile` و`docker-compose.yml`: صورة API متعددة المراحل، وOllama، وQdrant الاختياري.
+- `src/cela_sh/server.py`: API محلية اختيارية؛ تُثبت عبر `pip install -e '.[server]'`.
 - `src/cela_sh/settings.py`: إعدادات البيئة والتحقق منها.
 - `src/cela_sh/factory.py`: تركيب الخدمات والمزودات دون ربط المستهلك بتفاصيل Qdrant.
 - `src/cela_sh/planner/`: مخططات البيانات، عميل Ollama، والسياسة المستقلة.
-- `src/cela_sh/memory/`: عقد الذاكرة، مخزن اختباري مؤقت، embeddings، محول Qdrant REST، و`registry.py` لتسجيل مخازن جديدة.
+- `src/cela_sh/memory/`: عقد الذاكرة، مخزن اختباري مؤقت، embeddings، محول Qdrant REST، ومخزن `vec0` الحقيقي، و`registry.py` لتسجيل مخازن جديدة.
 - `tests/`: اختبارات offline، وعقود سلوكية مشتركة في `contract_memory_store.py`، وبدائل غير متصلة في `fakes.py`؛ `integration_plan_probe.py` لفحص توليد الخطة الحي و`integration_live_probe.py` لفحص الذاكرة الحي الاختياري.
 - `tools/api_surface.py`: يلتقط سطح العقد العام للمستودع في `tests/snapshots/api_surface.json` لكشف أي كسر توافق.
 - `docs/`: المعمارية والبروتوكول ودليل التوسعة وقائمة تسليم التشغيل.
@@ -114,9 +140,9 @@ git diff tests/snapshots/api_surface.json
 
 ## حدود الأمان والحالة
 
-- Ollama محصور على loopback، والـ HTTP redirects والبروكسيات البيئية غير مستخدمة.
+- Ollama محصور على loopback افتراضيًا. الاستثناء الصريح `CELA_ALLOW_OLLAMA_CONTAINER_HOST=true` يسمح باسم خدمة `ollama` فقط داخل شبكة Docker موثوقة؛ redirects والبروكسيات البيئية معطلة.
 - عنوان Qdrant البعيد يتطلب HTTPS ومفتاح API. لا تنشر منافذ الخدمات على الإنترنت.
-- صور Compose تستخدم `latest` للتجربة المحلية؛ ثبّت tags أو digests معروفة قبل بيئة مشتركة.
+- صورة Ollama تستخدم tag محددًا؛ ثبّت digests معتمدة لـ`PYTHON_IMAGE` و`OLLAMA_IMAGE` قبل نشر مُدار. Qdrant الاختياري يستخدم `latest` للتجربة المحلية، ويمكن تجاوزه بـ`QDRANT_IMAGE`.
 - مدخلات السياق والذكريات غير موثوقة؛ تصنيف السياسة أولي ولا يثبت سلامة الخطة.
 - لا توجد طبقة إدراك أو تنفيذ. الخطة `ready` ليست موافقة ولا إذناً بالفعل.
 - التكامل الحي مع Ollama يبقى غير متحقق حتى ينجح `bash ./cela.sh probe` على الجهاز المقصود. Qdrant اختياري ويُفحص منفصلاً عبر `bash ./cela.sh probe-memory`.

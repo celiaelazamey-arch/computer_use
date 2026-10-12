@@ -5,6 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import Mock, patch
 
 from cela_sh.cli import main
+from cela_sh.memory import MemoryStoreError
 from cela_sh.planner.client import (
     PlannerConnectionError,
     PlannerError,
@@ -135,6 +136,21 @@ class CliContractTests(unittest.TestCase):
                 self.assertEqual(exit_code, expected_exit)
                 self.assertEqual(stdout.getvalue(), "")
                 self.assertEqual(json.loads(stderr.getvalue())["error"]["code"], expected_code)
+
+    def test_storage_initialization_failure_keeps_the_json_error_contract(self):
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with patch("cela_sh.cli.Settings.from_env", return_value=Settings()), patch(
+            "cela_sh.cli.create_planner", side_effect=MemoryStoreError("sqlite-vec could not be loaded")
+        ):
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(["--goal", "Read a page"])
+
+        self.assertEqual(exit_code, 6)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(json.loads(stderr.getvalue()), {
+            "error": {"code": "planner_memory_error", "message": "sqlite-vec could not be loaded"}
+        })
 
     def test_keyboard_interrupt_returns_130_and_json_error(self):
         planner = Mock()

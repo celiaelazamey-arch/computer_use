@@ -4,6 +4,7 @@ import sys
 from collections.abc import Sequence
 
 from .factory import create_planner
+from .memory import MemoryStoreError
 from .planner.client import (
     PlannerConnectionError,
     PlannerError,
@@ -53,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--goal", required=True, type=non_blank, help="The user's goal")
     parser.add_argument("--context", default="", help="Dummy or manually supplied screen context")
     parser.add_argument("--model", default=None, type=non_blank, help="Override the configured local planner model")
-    parser.add_argument("--session-id", default=None, type=non_blank, help="Required when Qdrant memory is enabled")
+    parser.add_argument("--session-id", default=None, type=non_blank, help="Required when memory is enabled")
     return parser
 
 
@@ -76,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except PlannerValidationError as exc:
         write_error("planner_validation_error", str(exc))
         return EXIT_CODES["planner_validation_error"]
-    except PlannerMemoryError as exc:
+    except (PlannerMemoryError, MemoryStoreError) as exc:
         write_error("planner_memory_error", str(exc))
         return EXIT_CODES["planner_memory_error"]
     except PlannerError as exc:

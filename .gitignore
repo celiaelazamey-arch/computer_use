@@ -6,6 +6,10 @@ __pycache__/
 build/
 dist/
 .pytest_cache/
+*.db
+*.db-wal
+*.db-shm
+data/
 .env
 .env.*
 !.env.example
