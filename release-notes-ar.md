@@ -2,7 +2,7 @@
 
 إصدار أمني وتوثيقي. لا يغيّر سلوك التخطيط نفسه: الخطة تبقى `dry_run=true` و`execution_enabled=false`، ولا يوجد `/execute`.
 
-> **تنبيه الروابط:** كل رابط في هذه الملاحظات يشير إلى `main`. لا تعمل الروابط إلا بعد دمج Pull Request الخاص بهذا الإصدار في `main` ووسم الكوميت المدموج. قبل الدمج ستعيد `404`.
+> **تنبيه الروابط:** كل رابط في هذه الملاحظات يشير إلى `main`. لا تعمل الروابط إلا بعد دمج [Pull Request #17](https://github.com/celiaelazamey-arch/computer_use/pull/17) في `main` ووسم الكوميت المدموج. قبل الدمج ستعيد `404`.
 
 ### المرجع الوحيد لعقد الأخطاء
 
@@ -139,7 +139,7 @@ git push origin v1.0.1
 **الخيار ٢ — وسم على SHA محدَّد صراحةً** إن أردت تثبيت المعلَم حتى لو تحرّك `main` قبل الدفع:
 
 ```bash
-MERGE_SHA=$(gh pr view <PR> --json mergeCommit --jq .mergeCommit.oid)
+MERGE_SHA=$(gh pr view 17 --json mergeCommit --jq .mergeCommit.oid)
 git tag -a v1.0.1 "$MERGE_SHA" -m "CELA.sh 1.0.1"
 git push origin v1.0.1
 ```
@@ -169,4 +169,6 @@ gh release create v1.0.1 --title "CELA.sh 1.0.1" --notes-file /tmp/notes-1.0.1.m
 
 API **بلا مصادقة**، و`session_id` مُعرِّف اختيار لا تفويض. Compose ينشر المنفذ على loopback للمضيف فقط. لا تعرّض الخدمة لشبكة غير موثوقة قبل إضافة مصادقة وتخويل. راجع [`SECURITY.md`](https://github.com/celiaelazamey-arch/computer_use/blob/main/SECURITY.md) و[`docs/threat-model-cela.md`](https://github.com/celiaelazamey-arch/computer_use/blob/main/docs/threat-model-cela.md) (البند T11).
 
-**Full Changelog**: https://github.com/celiaelazamey-arch/computer_use/commits/v1.0.1
+**تغييرات الإصدار**: https://github.com/celiaelazamey-arch/computer_use/commits/v1.0.1
+
+(لا يمكن توليد رابط مقارنة `v1.0.0...v1.0.1` لأن `1.0.0` لم يُوسم قط؛ `v1.0.1` هو أول وسم في المستودع.)

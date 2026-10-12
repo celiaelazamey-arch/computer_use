@@ -2,7 +2,7 @@
 
 A security and documentation release. Planning behavior itself is unchanged: plans remain `dry_run=true` and `execution_enabled=false`, and there is no `/execute`.
 
-> **Link notice:** every link in these notes points at `main`. They resolve only after this release's pull request is merged into `main` and the merge commit is tagged. Before the merge they return `404`.
+> **Link notice:** every link in these notes points at `main`. They resolve only after [pull request #17](https://github.com/celiaelazamey-arch/computer_use/pull/17) is merged into `main` and the merge commit is tagged. Before the merge they return `404`.
 
 ### One reference for the error contract
 
@@ -139,7 +139,7 @@ git push origin v1.0.1
 **Option 2 — tag an explicit SHA** to pin the marker even if `main` moves before you push:
 
 ```bash
-MERGE_SHA=$(gh pr view <PR> --json mergeCommit --jq .mergeCommit.oid)
+MERGE_SHA=$(gh pr view 17 --json mergeCommit --jq .mergeCommit.oid)
 git tag -a v1.0.1 "$MERGE_SHA" -m "CELA.sh 1.0.1"
 git push origin v1.0.1
 ```
@@ -170,3 +170,5 @@ In both cases the reference table stays single: both files re-display `docs/api-
 The API is **unauthenticated**, and `session_id` is a selector, not an authorization. Compose publishes the port on host loopback only. Do not expose the service to an untrusted network before adding authentication and authorization. See [`SECURITY.md`](https://github.com/celiaelazamey-arch/computer_use/blob/main/SECURITY.md) and [`docs/threat-model-cela.md`](https://github.com/celiaelazamey-arch/computer_use/blob/main/docs/threat-model-cela.md) (item T11).
 
 **Full Changelog**: https://github.com/celiaelazamey-arch/computer_use/commits/v1.0.1
+
+(A `v1.0.0...v1.0.1` compare link is not possible because `1.0.0` was never tagged; `v1.0.1` is the repository's first tag.)
