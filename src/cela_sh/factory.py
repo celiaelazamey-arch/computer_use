@@ -16,6 +16,7 @@ def _build_qdrant_store(config: Settings, timeout: tuple[float, float]) -> Qdran
         model=config.embedding_model,
         base_url=config.ollama_url,
         timeout=timeout,
+        **({"allow_container_host": True} if getattr(config, "allow_ollama_container_host", False) is True else {}),
     )
     return QdrantMemoryStore(
         collection_name=config.qdrant_collection,
@@ -32,6 +33,7 @@ def _build_sqlite_vec_store(config: Settings, timeout: tuple[float, float]) -> S
         model=config.embedding_model,
         base_url=config.ollama_url,
         timeout=timeout,
+        **({"allow_container_host": True} if getattr(config, "allow_ollama_container_host", False) is True else {}),
     )
     return SqliteVecMemoryStore(
         db_path=config.sqlite_vec_path,
@@ -65,4 +67,5 @@ def create_planner(settings: Settings | None = None, model: str | None = None) -
         memory_store=memory_store,
         memory_limit=config.memory_limit,
         base_url=config.ollama_url,
+        **({"allow_container_host": True} if getattr(config, "allow_ollama_container_host", False) is True else {}),
     )

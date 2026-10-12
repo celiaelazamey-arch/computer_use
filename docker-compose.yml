@@ -1,10 +1,50 @@
 services:
+  cela-sh-api:
+    profiles: ["api"]
+    build:
+      context: .
+      target: runtime
+      args:
+        PYTHON_IMAGE: "${PYTHON_IMAGE:-python:3.11-slim-bookworm}"
+    image: cela-sh-api:local
+    ports:
+      - "127.0.0.1:${CELA_API_PORT:-8000}:8000"
+    environment:
+      CELA_OLLAMA_URL: http://ollama:11434
+      CELA_ALLOW_OLLAMA_CONTAINER_HOST: "true"
+      CELA_PLANNER_MODEL: "${CELA_PLANNER_MODEL:-qwen2.5:3b}"
+      CELA_EMBEDDING_MODEL: "${CELA_EMBEDDING_MODEL:-nomic-embed-text}"
+      CELA_MEMORY_BACKEND: sqlite-vec
+      CELA_SQLITE_VEC_PATH: /app/data/cela_memory.db
+      CELA_MEMORY_LIMIT: "${CELA_MEMORY_LIMIT:-3}"
+      CELA_CONNECT_TIMEOUT: "${CELA_CONNECT_TIMEOUT:-3.05}"
+      CELA_READ_TIMEOUT: "${CELA_READ_TIMEOUT:-60}"
+    volumes:
+      - cela_data:/app/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    init: true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
   ollama:
-    image: "${OLLAMA_IMAGE:-ollama/ollama:latest}"
+    image: "${OLLAMA_IMAGE:-ollama/ollama:0.40.3}"
     ports:
       - "127.0.0.1:11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
     restart: unless-stopped
 
   qdrant:
@@ -17,5 +57,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  cela_data:
   ollama_data:
   qdrant_data:

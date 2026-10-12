@@ -15,11 +15,13 @@ One product with two deliberately separate runtimes. They share maintenance, CI,
 
 ### `cela.sh` — local planner (Python 3.11+, Ollama)
 
-- Converts a goal and optional text context into a strict JSON plan through a loopback-only Ollama endpoint.
+- Converts a goal and optional text context into a strict JSON plan through loopback Ollama by default; an explicit container-only option allows exactly the trusted `ollama` service.
 - Validates every model response against a Pydantic schema (`extra="forbid"`, `strict=True`) and adds deterministic risk labels from a policy that is independent of the model.
 - Every plan carries `dry_run=true` and `execution_enabled=false` as type-level `Literal` locks. There is no execution layer: no screen capture, clicking, typing, or shell commands.
 - Errors never become plans. A typed exception hierarchy maps to stable JSON on stderr and a fixed exit-code table; stdout carries the plan only.
-- Optional Qdrant memory, disabled by default, requiring an explicit `session_id`. The session filter is sent to the server and re-checked locally; planning never writes to memory.
+- Optional Qdrant or official sqlite-vec memory, disabled by default in CLI/Python, requiring an explicit `session_id`. Native vec0 cosine KNN filters sessions before top-k; the metadata join checks them again. Text/vector writes and legacy BLOB migration are atomic, without re-embedding.
+- An optional local FastAPI API exposes dry-run plans and explicit memory writes/searches. It is not authenticated; session IDs are not authorization and host ports stay on loopback.
+- A multi-stage, installed-wheel Docker image runs the API as a non-root user, with persistent SQLite storage, a read-only filesystem, liveness checks, and a separate Ollama service. The optional API profile preserves existing CLI service commands.
 - Memory backends are registered, not wired in: `register_memory_backend` is the single source of truth for accepted `CELA_MEMORY_BACKEND` values, and every backend is held to the same behavioral contract suite.
 
 ### `ccelia2027` — read-only web agent (Cloudflare Worker)
@@ -42,4 +44,4 @@ One product with two deliberately separate runtimes. They share maintenance, CI,
 
 ### Verification status
 
-116 Python tests and 27 Worker tests pass offline, with 89% statement coverage on `src/cela_sh`. The live Ollama probe (`bash ./cela.sh probe`) and the live Qdrant probe (`bash ./cela.sh probe-memory`) are opt-in and have not been run against a target machine in CI. The Worker has not been deployed from this revision, and no live model or Browser Run task has been verified.
+Offline tests cover the shared memory contracts, real sqlite-vec loading and KNN, session prefiltering, atomic migration/rollback, and the local HTTP API. CI also defines a Compose/image/runtime smoke check without starting Ollama or downloading models. The live Ollama and Qdrant probes remain opt-in; container deployment and model readiness must still be verified on the target machine. No Worker deployment or live Browser Run task is claimed for this revision.

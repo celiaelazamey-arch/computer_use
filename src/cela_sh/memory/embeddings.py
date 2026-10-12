@@ -1,10 +1,9 @@
-import ipaddress
 import math
 from abc import ABC, abstractmethod
-from urllib.parse import urlparse
 
 import requests
 
+from ..ollama_url import validate_ollama_url
 from .base import MemoryStoreError
 
 
@@ -20,20 +19,12 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
         model: str = "nomic-embed-text",
         base_url: str = "http://127.0.0.1:11434",
         timeout: tuple[float, float] = (3.05, 60.0),
+        *,
+        allow_container_host: bool = False,
     ) -> None:
         if not model.strip():
             raise ValueError("embedding model must not be blank")
-        parsed = urlparse(base_url)
-        if parsed.scheme != "http" or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("Ollama embeddings must use a local HTTP base URL")
-        if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
-            raise ValueError("Ollama base URL must not contain a path, query, or fragment")
-        try:
-            local_host = parsed.hostname == "localhost" or ipaddress.ip_address(parsed.hostname).is_loopback
-        except ValueError:
-            local_host = False
-        if not local_host:
-            raise ValueError("Ollama embeddings are restricted to loopback hosts")
+        validate_ollama_url(base_url, allow_container_host=allow_container_host)
 
         self.model = model
         self.url = f"{base_url.rstrip('/')}/api/embed"
