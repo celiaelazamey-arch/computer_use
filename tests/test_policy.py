@@ -112,6 +112,17 @@ class BenignPolicyRegressionTests(unittest.TestCase):
         )
         self.assertEqual(plan.status, PlanStatus.READY)
 
+    def test_lookalike_words_like_pseudocode_and_sudoku_stay_ready(self):
+        for term in ("pseudocode algorithms", "daily sudoku puzzle"):
+            with self.subTest(term=term):
+                plan = _plan(
+                    f"read about {term}",
+                    [(Action.SEARCH_WEB, "browser search field", term), (Action.STOP, "", "")],
+                )
+                self.assertEqual(plan.status, PlanStatus.READY)
+                self.assertFalse(plan.requires_confirmation)
+                self.assertEqual(plan.steps[0].risk, RiskLevel.LOW)
+
 
 class ShellBlockingStillWorksTests(unittest.TestCase):
     def test_powershell_open_is_blocked(self):
@@ -121,6 +132,58 @@ class ShellBlockingStillWorksTests(unittest.TestCase):
     def test_rm_rf_type_is_blocked(self):
         plan = _plan("type command", [(Action.TYPE, "terminal", "rm -rf /"), (Action.STOP, "", "")])
         self.assertEqual(plan.status, PlanStatus.BLOCKED)
+
+    def test_sudo_is_blocked_uniformly_across_all_action_types(self):
+        actions_and_steps = (
+            (Action.TYPE, "input field", "sudo apt update"),
+            (Action.SEARCH_WEB, "browser search field", "sudo systemctl restart nginx"),
+            (Action.NAVIGATE, "browser address bar", "sudo://localhost"),
+            (Action.CLICK, "Run sudo command button", ""),
+            (Action.OPEN_APP, "sudo helper", ""),
+            (Action.OBSERVE, "sudo output pane", ""),
+            (Action.SCROLL, "page", "sudo"),
+            (Action.WAIT, "sudo process", ""),
+            (Action.ASK_USER, "user", "Please run sudo rm -rf /tmp/test"),
+            (Action.STOP, "sudo complete", ""),
+        )
+        for action, target, value in actions_and_steps:
+            with self.subTest(action=action.value):
+                plan = _plan("check system status", [(action, target, value)])
+                self.assertEqual(plan.status, PlanStatus.BLOCKED)
+                self.assertTrue(plan.requires_confirmation)
+                self.assertEqual(plan.steps[0].risk, RiskLevel.BLOCKED)
+                self.assertTrue(plan.steps[0].requires_confirmation)
+                self.assertTrue(
+                    any("execute it manually in your own terminal" in r for r in plan.steps[0].policy_reasons)
+                )
+
+    def test_sudo_or_os_command_in_goal_blocks_plan_even_when_step_text_is_innocuous(self):
+        for goal in (
+            "run sudo apt-get upgrade",
+            "execute rm -rf /var/tmp",
+            "شغل أمر سودو لتحديث النظام",
+            "run doas pkg_add curl",
+            "run pkexec visudo",
+            "run bash -c 'whoami'",
+        ):
+            with self.subTest(goal=goal):
+                plan = _plan(goal, [(Action.OBSERVE, "page", ""), (Action.STOP, "", "")])
+                self.assertEqual(plan.status, PlanStatus.BLOCKED)
+                self.assertTrue(plan.requires_confirmation)
+                self.assertEqual(plan.steps[0].risk, RiskLevel.BLOCKED)
+
+    def test_shell_target_is_blocked_across_non_open_actions_and_arabic(self):
+        for action, target in (
+            (Action.CLICK, "terminal window"),
+            (Action.TYPE, "bash prompt"),
+            (Action.NAVIGATE, "PowerShell"),
+            (Action.OPEN_APP, "الطرفية"),
+            (Action.CLICK, "سطر الأوامر"),
+        ):
+            with self.subTest(action=action.value, target=target):
+                plan = _plan("check status", [(action, target, ""), (Action.STOP, "", "")])
+                self.assertEqual(plan.status, PlanStatus.BLOCKED)
+                self.assertEqual(plan.steps[0].risk, RiskLevel.BLOCKED)
 
 
 if __name__ == "__main__":

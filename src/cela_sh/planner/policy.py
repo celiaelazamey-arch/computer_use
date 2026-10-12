@@ -19,9 +19,15 @@ SENSITIVE_TERMS = re.compile(
     r"أرسل|ارسل|إرسال|ارسال|قدّم|قدم|انشر|ارفع|شارك|راسل|مراسلة|اشترك|اشتراك)",
     re.IGNORECASE,
 )
-SHELL_APP_TERMS = re.compile(r"\b(powershell|cmd\.exe|command prompt|terminal|bash|zsh|shell)\b", re.IGNORECASE)
+SHELL_APP_TERMS = re.compile(
+    r"\b(powershell|cmd\.exe|command prompt|terminal|bash|zsh|shell)\b|(الطرفية|سطر الأوامر)",
+    re.IGNORECASE,
+)
 SHELL_COMMAND_TERMS = re.compile(
-    r"\b(sudo\s+|rm\s+-rf\b|del\s+/[sqf]\b|format\s+[a-z]:|powershell\s+-|cmd\s+/c\b)",
+    r"\b(sudo\b|doas\b|pkexec\b|su\s+(?:-\b|root\b)|rm\s+-[a-z]*[rf][a-z]*\b|"
+    r"chmod\s+(?:[0-7]{3,4}|[ugoa]*[+-][rwxst]+)\b|chown\s+\S+|"
+    r"del\s+/[sqf]\b|format\s+[a-z]:|powershell(?:\.exe)?\s+-|cmd(?:\.exe)?\s+/c\b|"
+    r"(?:bash|sh|zsh)\s+-c\b)|(?:^|\s)سودو(?:\s|$)",
     re.IGNORECASE,
 )
 
@@ -33,16 +39,22 @@ def apply_policy(raw_plan: RawPlan, request: PlannerInput) -> Plan:
         if step.action is Action.SEARCH_WEB:
             step_data["target"] = "browser search field"
             step_data["value"] = step.value.strip() or step.target.strip()
-        step_text = " ".join((step_data["target"], step_data["value"], step.reason))
+        step_text = " ".join((step.target, step_data["target"], step_data["value"], step.reason))
         blocked = (
-            (step.action is Action.OPEN_APP and SHELL_APP_TERMS.search(step_data["target"]) is not None)
-            or (step.action is Action.TYPE and SHELL_COMMAND_TERMS.search(step_data["value"]) is not None)
+            SHELL_APP_TERMS.search(step.target) is not None
+            or SHELL_APP_TERMS.search(step_data["target"]) is not None
+            or SHELL_COMMAND_TERMS.search(step_text) is not None
+            or SHELL_COMMAND_TERMS.search(request.goal) is not None
         )
         needs_confirmation = bool(SENSITIVE_TERMS.search(request.goal) or SENSITIVE_TERMS.search(step_text))
 
         if blocked:
             risk = RiskLevel.BLOCKED
-            reasons = ["This step targets a shell or contains an OS command, which this planner forbids."]
+            reasons = [
+                "This step targets a shell or contains a privileged/OS command (such as sudo), which this "
+                "dry-run planner forbids. If you intend to run a system command, execute it manually in your "
+                "own terminal."
+            ]
         elif needs_confirmation:
             risk = RiskLevel.REQUIRES_CONFIRMATION
             reasons = ["A deterministic policy matched a sensitive operation or data category."]
