@@ -112,18 +112,18 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
     @application.exception_handler(PlannerError)
     async def planner_error_handler(request: Request, exc: PlannerError):
         if isinstance(exc, PlannerConnectionError):
-            return _error(503, "planner_connection_error", str(exc))
+            return _error(503, "planner_connection_error", "Unable to connect to planner service.")
         if isinstance(exc, PlannerResponseError):
-            return _error(502, "planner_response_error", str(exc))
+            return _error(502, "planner_response_error", "Planner service returned an invalid response.")
         if isinstance(exc, PlannerValidationError):
-            return _error(422, "planner_validation_error", str(exc))
+            return _error(422, "planner_validation_error", "Planner input validation failed.")
         if isinstance(exc, PlannerMemoryError):
-            return _error(503, "planner_memory_error", str(exc))
-        return _error(500, "planner_error", str(exc))
+            return _error(503, "planner_memory_error", "Planner memory backend is unavailable.")
+        return _error(500, "planner_error", "An internal planner error occurred.")
 
     @application.exception_handler(MemoryStoreError)
     async def memory_error_handler(request: Request, exc: MemoryStoreError):
-        return _error(503, "memory_store_error", str(exc))
+        return _error(503, "memory_store_error", "Memory store is unavailable.")
 
     @application.get("/health", tags=["health"])
     def health():
@@ -155,7 +155,7 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
             with application.state.backend_lock:
                 stored = store.add_memory(body.session_id, body.content, body.metadata)
         except ValueError as exc:
-            return _error(422, "memory_validation_error", str(exc))
+            return _error(422, "memory_validation_error", "Invalid memory input.")
         if stored is not True:
             raise MemoryStoreError("Memory store did not confirm the write.")
         return {"stored": True}
@@ -169,7 +169,7 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
             with application.state.backend_lock:
                 return store.search_memory(body.query, body.session_id, limit=body.limit)
         except ValueError as exc:
-            return _error(422, "memory_validation_error", str(exc))
+            return _error(422, "memory_validation_error", "Invalid memory search input.")
 
     return application
 
