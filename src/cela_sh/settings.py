@@ -38,6 +38,7 @@ class Settings:
     embedding_model: str = "nomic-embed-text"
     memory_backend: str = "disabled"
     memory_limit: int = 3
+    sqlite_vec_path: str = "cela_memory.db"
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "agent_memory"
     qdrant_api_key: str | None = None
@@ -57,6 +58,8 @@ class Settings:
             not self.qdrant_url.strip() or not self.qdrant_collection.strip()
         ):
             raise ConfigurationError("Qdrant URL and collection must not be blank when memory is enabled.")
+        if self.memory_backend == "sqlite-vec" and not self.sqlite_vec_path.strip():
+            raise ConfigurationError("CELA_SQLITE_VEC_PATH must not be blank when sqlite-vec backend is enabled.")
         if self.qdrant_api_key is not None and not self.qdrant_api_key.strip():
             raise ConfigurationError("CELA_QDRANT_API_KEY must not be blank when set.")
         if isinstance(self.memory_limit, bool) or not isinstance(self.memory_limit, int) or self.memory_limit < 1:
@@ -85,6 +88,7 @@ class Settings:
             embedding_model=os.environ.get("CELA_EMBEDDING_MODEL", "nomic-embed-text").strip(),
             memory_backend=os.environ.get("CELA_MEMORY_BACKEND", "disabled").strip().lower(),
             memory_limit=_positive_int("CELA_MEMORY_LIMIT", 3),
+            sqlite_vec_path=os.environ.get("CELA_SQLITE_VEC_PATH", "cela_memory.db").strip(),
             qdrant_url=os.environ.get("CELA_QDRANT_URL", "http://127.0.0.1:6333").strip(),
             qdrant_collection=os.environ.get("CELA_QDRANT_COLLECTION", "agent_memory").strip(),
             qdrant_api_key=api_key.strip() if api_key and api_key.strip() else None,

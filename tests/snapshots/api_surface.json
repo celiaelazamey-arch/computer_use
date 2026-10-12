@@ -2,7 +2,8 @@
   "python": {
     "builtin_memory_backends": [
       "disabled",
-      "qdrant"
+      "qdrant",
+      "sqlite-vec"
     ],
     "cli_flags": [
       {
@@ -89,7 +90,8 @@
         "kind": "set",
         "value": [
           "disabled",
-          "qdrant"
+          "qdrant",
+          "sqlite-vec"
         ]
       },
       "ConfigurationError": {
@@ -339,12 +341,28 @@
           "read_timeout": {
             "annotation": "float",
             "required": false
+          },
+          "sqlite_vec_path": {
+            "annotation": "str",
+            "required": false
           }
         },
-        "init": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None",
+        "init": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None",
         "kind": "class",
         "methods": {
-          "__init__": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None"
+          "__init__": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None"
+        }
+      },
+      "SqliteVecMemoryStore": {
+        "bases": [
+          "cela_sh.memory.base.MemoryStore"
+        ],
+        "init": "(self, db_path: str, embedding_provider: cela_sh.memory.embeddings.EmbeddingProvider, timeout: float = 5.0) -> None",
+        "kind": "class",
+        "methods": {
+          "__init__": "(self, db_path: str, embedding_provider: cela_sh.memory.embeddings.EmbeddingProvider, timeout: float = 5.0) -> None",
+          "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
         }
       },
       "build_memory_store": {
@@ -382,7 +400,8 @@
     },
     "memory_backends": [
       "disabled",
-      "qdrant"
+      "qdrant",
+      "sqlite-vec"
     ],
     "package_exports": {
       "cela_sh": [
@@ -407,6 +426,7 @@
         "QdrantMemoryStore",
         "RiskLevel",
         "Settings",
+        "SqliteVecMemoryStore",
         "build_memory_store",
         "create_planner",
         "is_known_memory_backend",
@@ -427,6 +447,7 @@
         "MockMemoryStore",
         "OllamaEmbeddingProvider",
         "QdrantMemoryStore",
+        "SqliteVecMemoryStore",
         "build_memory_store",
         "is_known_memory_backend",
         "memory_backend_names",

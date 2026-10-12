@@ -59,7 +59,7 @@ from cela_sh.planner.policy import apply_policy  # noqa: E402
 #: Backends covered by a MemoryStoreContract suite in this module. Registering a
 #: backend without adding it here fails
 #: ``test_every_registered_backend_is_covered_by_a_contract_suite``.
-COVERED_BACKENDS = frozenset({"qdrant", "example"})
+COVERED_BACKENDS = frozenset({"qdrant", "example", "sqlite-vec"})
 
 OBSERVE_STEP = {
     "action": Action.OBSERVE,
@@ -157,6 +157,25 @@ class QdrantMemoryStoreContractTests(MemoryStoreContract, unittest.TestCase):
 class ExampleMemoryStoreContractTests(MemoryStoreContract, unittest.TestCase):
     def make_store(self) -> Any:
         return ExampleMemoryStore()
+
+
+class SqliteVecMemoryStoreContractTests(MemoryStoreContract, unittest.TestCase):
+    """Runs the shared contract against the sqlite-vec backend with a deterministic embedding."""
+
+    def make_store(self) -> Any:
+        import tempfile
+        from pathlib import Path
+
+        from cela_sh.memory import SqliteVecMemoryStore
+
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_memory.db"
+
+        return SqliteVecMemoryStore(
+            db_path=str(db_path),
+            embedding_provider=DeterministicEmbedding(),
+            timeout=5.0,
+        )
 
 
 class QdrantSessionFilterDefenceTests(unittest.TestCase):
