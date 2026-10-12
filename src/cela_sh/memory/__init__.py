@@ -15,6 +15,7 @@ from .registry import (
     satisfies_memory_contract,
     unregister_memory_backend,
 )
+from .sqlite_vec_store import SqliteVecMemoryStore
 
 __all__ = [
     "BUILTIN_MEMORY_BACKENDS",
@@ -27,6 +28,7 @@ __all__ = [
     "MockMemoryStore",
     "OllamaEmbeddingProvider",
     "QdrantMemoryStore",
+    "SqliteVecMemoryStore",
     "build_memory_store",
     "is_known_memory_backend",
     "memory_backend_names",

@@ -2,6 +2,7 @@ from .memory import (
     DISABLED_BACKEND,
     OllamaEmbeddingProvider,
     QdrantMemoryStore,
+    SqliteVecMemoryStore,
     build_memory_store,
     register_memory_backend,
 )
@@ -25,9 +26,24 @@ def _build_qdrant_store(config: Settings, timeout: tuple[float, float]) -> Qdran
     )
 
 
+def _build_sqlite_vec_store(config: Settings, timeout: tuple[float, float]) -> SqliteVecMemoryStore:
+    """Built-in ``sqlite-vec`` backend: local SQLite file with vector embeddings."""
+    embeddings = OllamaEmbeddingProvider(
+        model=config.embedding_model,
+        base_url=config.ollama_url,
+        timeout=timeout,
+    )
+    return SqliteVecMemoryStore(
+        db_path=config.sqlite_vec_path,
+        embedding_provider=embeddings,
+        timeout=timeout[1],  # read timeout
+    )
+
+
 # Registering here keeps the adapter names in this module's namespace, so tests
 # and callers can still patch or replace them without touching the registry.
 register_memory_backend("qdrant", _build_qdrant_store, replace=True)
+register_memory_backend("sqlite-vec", _build_sqlite_vec_store, replace=True)
 
 
 def create_planner(settings: Settings | None = None, model: str | None = None) -> OllamaPlanner:

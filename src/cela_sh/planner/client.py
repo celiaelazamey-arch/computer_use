@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import logging
 from urllib.parse import urlparse
 
 import requests
@@ -8,6 +9,8 @@ from pydantic import ValidationError
 from ..memory import MemoryStore, MemoryStoreError
 from .models import Plan, PlannerInput, RawPlan
 from .policy import apply_policy
+
+_logger = logging.getLogger(__name__)
 
 
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
@@ -139,23 +142,78 @@ class OllamaPlanner:
                 )
             response.raise_for_status()
         except requests.Timeout as exc:
+            _logger.error(
+                "Ollama request timed out",
+                extra={
+                    "url": self.url,
+                    "model": self.model,
+                    "connect_timeout": self.timeout[0],
+                    "read_timeout": self.timeout[1],
+                    "error_type": "timeout",
+                },
+            )
             raise PlannerConnectionError("Timed out while contacting local Ollama.") from exc
         except requests.HTTPError as exc:
+            _logger.error(
+                "Ollama returned an HTTP error",
+                extra={
+                    "url": self.url,
+                    "model": self.model,
+                    "status_code": exc.response.status_code if exc.response is not None else None,
+                    "error_type": "http_error",
+                },
+            )
             raise PlannerResponseError("Local Ollama returned an unsuccessful HTTP status.") from exc
         except requests.RequestException as exc:
+            _logger.error(
+                "Could not contact Ollama",
+                extra={
+                    "url": self.url,
+                    "model": self.model,
+                    "error_type": exc.__class__.__name__,
+                    "error_message": str(exc),
+                },
+            )
             raise PlannerConnectionError("Could not contact local Ollama.") from exc
 
         try:
             body = response.json()
         except requests.JSONDecodeError as exc:
+            _logger.error(
+                "Ollama returned invalid JSON",
+                extra={
+                    "url": self.url,
+                    "model": self.model,
+                    "error_type": "json_decode_error",
+                    "error_message": str(exc),
+                },
+            )
             raise PlannerResponseError("Ollama returned invalid JSON.") from exc
 
         if not isinstance(body, dict) or not isinstance(body.get("response"), str):
+            _logger.error(
+                "Ollama response is missing its generated plan",
+                extra={
+                    "url": self.url,
+                    "model": self.model,
+                    "error_type": "missing_response_field",
+                    "response_keys": list(body.keys()) if isinstance(body, dict) else None,
+                },
+            )
             raise PlannerResponseError("Ollama response is missing its generated plan.")
 
         try:
             raw_plan = RawPlan.model_validate_json(body["response"])
         except ValidationError as exc:
+            _logger.error(
+                "Generated plan did not match the strict schema",
+                extra={
+                    "url": self.url,
+                    "model": self.model,
+                    "error_type": "validation_error",
+                    "error_message": str(exc),
+                },
+            )
             raise PlannerValidationError("Generated plan did not match the strict schema.") from exc
 
         return apply_policy(raw_plan, request)

@@ -21,7 +21,7 @@ DISABLED_BACKEND = "disabled"
 
 #: Backends this repository ships. Names are data only, so settings validation
 #: never has to import an adapter (or its HTTP client) to answer a question.
-BUILTIN_MEMORY_BACKENDS = frozenset({DISABLED_BACKEND, "qdrant"})
+BUILTIN_MEMORY_BACKENDS = frozenset({DISABLED_BACKEND, "qdrant", "sqlite-vec"})
 
 
 class MemoryBackendSettings(Protocol):
