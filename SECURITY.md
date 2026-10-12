@@ -16,6 +16,7 @@ This repository ships two components with deliberately different attack surfaces
 - There is no execution layer: no screen capture, no clicking, no typing, no shell commands.
 - Ollama defaults to loopback HTTP. An explicit `CELA_ALLOW_OLLAMA_CONTAINER_HOST=true` exception permits exactly the `ollama` service on a trusted Docker network, not arbitrary LAN/public hosts. Redirects are rejected and environment proxies are disabled (`trust_env = False`).
 - The optional Python API is unauthenticated and Compose publishes it on host loopback only. Session IDs are selectors, not credentials: do not expose it to untrusted users before adding Auth/Z.
+- Every API failure returns a code and a fixed sentence. Unexpected exceptions are answered with a sanitized `500` (`internal_error`); exception text, exception type, and tracebacks are logged server-side and never returned to the caller.
 - SQLite memory uses the official sqlite-vec extension with native session-prefiltered cosine KNN and a second session check at the metadata join. Writes and legacy migration are atomic; unusable vectors fail closed. Extension loading is disabled immediately after loading the packaged extension.
 - A remote Qdrant endpoint requires both HTTPS and an API key.
 - When memory is enabled, a `session_id` is mandatory, the filter is sent to the server **and** re-checked locally, and planning never writes to memory.

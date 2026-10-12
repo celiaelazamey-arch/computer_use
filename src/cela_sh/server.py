@@ -3,8 +3,13 @@
 Run with ``uvicorn cela_sh.server:app`` after installing ``cela-sh[server]``.
 Do not expose this API to untrusted networks; session IDs are selectors, not
 credentials. Compose publishes it on host loopback only.
+
+Every failure is answered with a stable code and a fixed sentence. Unexpected
+exceptions become a sanitized ``500`` and are logged server-side; exception text,
+types, and tracebacks are never returned to the caller.
 """
 
+import logging
 from contextlib import asynccontextmanager
 from threading import Lock
 from typing import Any
@@ -12,6 +17,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import Field, model_validator
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .factory import create_planner
 from .memory import MemoryStore, MemoryStoreError
@@ -25,6 +31,8 @@ from .planner.client import (
 )
 from .planner.models import Plan, PlannerInput, StrictModel
 from .settings import Settings
+
+_logger = logging.getLogger(__name__)
 
 
 class PlanRequest(PlannerInput):
@@ -72,6 +80,50 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
+def _unexpected_error() -> JSONResponse:
+    """The only 500 a caller may see: no exception type, text, path, or traceback."""
+    return _error(500, "internal_error", "Internal server error.")
+
+
+class UnexpectedErrorMiddleware:
+    """Answer unhandled exceptions with the documented JSON envelope.
+
+    Domain failures have typed handlers, so anything that arrives here is a bug.
+    Starlette's server-error handler would either return a plain-text body or,
+    with a registered handler, send its response and re-raise the exception --
+    which lets a debug server or a test client surface the original detail.
+    Answering inside the request path keeps the status, body, and media type
+    identical for every unexpected failure, while the traceback is written to the
+    log only.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        response_started = False
+
+        async def send_and_track_start(message: Message) -> None:
+            nonlocal response_started
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_and_track_start)
+        except Exception:
+            if response_started:
+                # Part of the response is already on the wire and cannot be
+                # replaced by a JSON body without corrupting the stream.
+                raise
+            _logger.exception("Unhandled error while serving %s", scope.get("path", "an unknown path"))
+            await _unexpected_error()(scope, receive, send)
+
+
 def create_app(settings: Settings | None = None, planner: Planner | None = None) -> FastAPI:
     """Build an app without network or database I/O until its lifespan starts."""
 
@@ -108,6 +160,10 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         description="Local planning only: dry_run=true, execution_enabled=false. No authentication yet.",
         lifespan=lifespan,
     )
+    # Sits outside the domain handlers and inside Starlette's server-error
+    # handler, so an unexpected failure becomes a sanitized 500 before anything
+    # can re-raise it to the caller.
+    application.add_middleware(UnexpectedErrorMiddleware)
 
     @application.exception_handler(PlannerError)
     async def planner_error_handler(request: Request, exc: PlannerError):
@@ -154,7 +210,7 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         try:
             with application.state.backend_lock:
                 stored = store.add_memory(body.session_id, body.content, body.metadata)
-        except ValueError as exc:
+        except ValueError:
             return _error(422, "memory_validation_error", "Invalid memory input.")
         if stored is not True:
             raise MemoryStoreError("Memory store did not confirm the write.")
@@ -168,7 +224,7 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         try:
             with application.state.backend_lock:
                 return store.search_memory(body.query, body.session_id, limit=body.limit)
-        except ValueError as exc:
+        except ValueError:
             return _error(422, "memory_validation_error", "Invalid memory search input.")
 
     return application
