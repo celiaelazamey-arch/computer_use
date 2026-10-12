@@ -64,9 +64,33 @@ jobs:
             --security-opt=no-new-privileges:true --tmpfs /tmp:rw,noexec,nosuid,size=64m \
             --volume cela-api-ci-data:/app/data \
             --publish 127.0.0.1:8000:8000 cela-sh-api:ci
-          curl --fail --silent --show-error --retry 12 --retry-delay 1 \
-            --retry-connrefused --max-time 5 http://127.0.0.1:8000/health | \
-            python -c 'import json, sys; h = json.load(sys.stdin); assert h["status"] == "ok" and h["memory_backend"] == "sqlite-vec" and h["dry_run"] is True and h["execution_enabled"] is False'
+          # Docker's port proxy accepts connections before uvicorn binds and then
+          # resets them. curl --retry-connrefused does not retry resets or empty
+          # replies, so poll explicitly and stop early if the container exits.
+          health=""
+          for attempt in $(seq 1 60); do
+            if [[ "$(docker inspect --format '{{.State.Running}}' cela-sh-api-ci)" != "true" ]]; then
+              echo "::error::API container exited before becoming healthy."
+              exit 1
+            fi
+            if health="$(curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8000/health 2>/dev/null)"; then
+              echo "API responded after ${attempt} attempt(s)."
+              break
+            fi
+            health=""
+            sleep 1
+          done
+          if [[ -z "$health" ]]; then
+            echo "::error::API /health did not respond within 60 seconds."
+            exit 1
+          fi
+          HEALTH="$health" python -c '
+          import json, os
+          h = json.loads(os.environ["HEALTH"])
+          expected = {"status": "ok", "memory_backend": "sqlite-vec", "dry_run": True, "execution_enabled": False}
+          assert h == expected, f"unexpected /health payload: {h!r}"
+          print("API liveness payload verified.")
+          '
       - name: Container logs and cleanup
         if: always()
         run: |
