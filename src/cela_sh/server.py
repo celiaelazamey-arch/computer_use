@@ -15,8 +15,8 @@ from pydantic import Field, model_validator
 
 from .factory import create_planner
 from .memory import MemoryStore, MemoryStoreError
+from .planner.base import Planner
 from .planner.client import (
-    OllamaPlanner,
     PlannerConnectionError,
     PlannerError,
     PlannerMemoryError,
@@ -72,7 +72,7 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
-def create_app(settings: Settings | None = None, planner: OllamaPlanner | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, planner: Planner | None = None) -> FastAPI:
     """Build an app without network or database I/O until its lifespan starts."""
 
     @asynccontextmanager
@@ -90,12 +90,15 @@ def create_app(settings: Settings | None = None, planner: OllamaPlanner | None =
             # planner. SQLite operation connections are already short-lived.
             if planner is None:
                 active = application.state.planner
-                active._session.close()
-                provider = getattr(active.memory_store, "embedding_provider", None)
+                session = getattr(active, "_session", None)
+                if session is not None:
+                    session.close()
+                store = getattr(active, "memory_store", None)
+                provider = getattr(store, "embedding_provider", None)
                 session = getattr(provider, "_session", None)
                 if session is not None:
                     session.close()
-                session = getattr(active.memory_store, "_session", None)
+                session = getattr(store, "_session", None)
                 if session is not None:
                     session.close()
 

@@ -24,6 +24,15 @@ def sample_raw_plan(action="SEARCH_WEB", target="", value="agent architecture", 
 
 
 class PlannerTests(unittest.TestCase):
+    def test_abstract_planner_contract_rejects_incomplete_providers(self):
+        from cela_sh.planner import Planner
+
+        class IncompletePlanner(Planner):
+            pass
+
+        with self.assertRaises(TypeError):
+            IncompletePlanner()
+
     def test_ollama_endpoint_must_remain_on_loopback_http(self):
         for base_url in ("http://192.168.1.8:11434", "https://127.0.0.1:11434", "http://localhost:11434/path"):
             with self.subTest(base_url=base_url), self.assertRaises(ValueError):

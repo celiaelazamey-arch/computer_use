@@ -100,9 +100,9 @@ curl --fail http://127.0.0.1:8000/health
 - `src/cela_sh/server.py`: API محلية اختيارية؛ تُثبت عبر `pip install -e '.[server]'`.
 - `src/cela_sh/settings.py`: إعدادات البيئة والتحقق منها.
 - `src/cela_sh/factory.py`: تركيب الخدمات والمزودات دون ربط المستهلك بتفاصيل Qdrant.
-- `src/cela_sh/planner/`: مخططات البيانات، عميل Ollama، والسياسة المستقلة.
+- `src/cela_sh/planner/`: عقد المخطط (`Planner`)، سجل مزودي التخطيط المحليين (`registry.py`)، مخططات البيانات، عميل Ollama، والسياسة المستقلة.
 - `src/cela_sh/memory/`: عقد الذاكرة، مخزن اختباري مؤقت، embeddings، محول Qdrant REST، ومخزن `vec0` الحقيقي، و`registry.py` لتسجيل مخازن جديدة.
-- `tests/`: اختبارات offline، وعقود سلوكية مشتركة في `contract_memory_store.py`، وبدائل غير متصلة في `fakes.py`؛ `integration_plan_probe.py` لفحص توليد الخطة الحي و`integration_live_probe.py` لفحص الذاكرة الحي الاختياري.
+- `tests/`: اختبارات offline، وعقود سلوكية مشتركة في `contract_memory_store.py` و`contract_planner.py`، وبدائل غير متصلة في `fakes.py`؛ `integration_plan_probe.py` لفحص توليد الخطة الحي و`integration_live_probe.py` لفحص الذاكرة الحي الاختياري.
 - `tools/api_surface.py`: يلتقط سطح العقد العام للمستودع في `tests/snapshots/api_surface.json` لكشف أي كسر توافق.
 - `docs/`: المعمارية والبروتوكول ودليل التوسعة وقائمة تسليم التشغيل.
 - `ccelia2027/`: تطبيق Worker مستقل داخل المستودع؛ استخدم [دليل تشغيله](ccelia2027/README.md) و[دليل النشر الموحد](CCELIA2027-DEPLOYMENT.md).
@@ -127,7 +127,7 @@ bash ./cela.sh services-stop
 
 ## التوسعة دون كسر النظام
 
-التوسعة إضافة لا جراحة. مخازن الذاكرة تُسجَّل عبر `register_memory_backend` دون تعديل `factory.py` أو `settings.py`، وكل backend جديد يخضع لمجموعة العقود السلوكية نفسها في `tests/contract_memory_store.py` — بما فيها عزل الجلسات ونسخ النتائج.
+التوسعة إضافة لا جراحة. مخازن الذاكرة تُسجَّل عبر `register_memory_backend` ومزودو التخطيط المحليون يُسجَّلون عبر `register_planner_provider` دون تعديل `factory.py` أو `settings.py`، وكل إضافة جديدة تخضع لمجموعات العقود السلوكية المشتركة في `tests/contract_memory_store.py` و`tests/contract_planner.py` — بما فيها عزل الجلسات، وقفل `dry_run=true`، وحجب أوامر النظام/`sudo` بشكل موحد.
 
 سطح العقد العام (الأسماء المصدَّرة، التواقيع، أعضاء `Action`، حقول النماذج، أعلام CLI، أكواد الخروج، ومسارات Worker) مُثبَّت في `tests/snapshots/api_surface.json`. أي حذف أو إعادة تسمية أو تغيير كود خروج يُفشل CI بدل أن يمر بصمت. بعد تغيير مقصود ومتوافق:
 

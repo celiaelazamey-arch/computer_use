@@ -4,9 +4,10 @@ import logging
 import requests
 from pydantic import ValidationError
 
-from ..memory import MemoryStore, MemoryStoreError
+from ..memory import MemoryStore
 from ..ollama_url import validate_ollama_url
-from .models import Plan, PlannerInput, RawPlan
+from .base import Planner
+from .models import Plan, RawPlan
 from .policy import apply_policy
 
 _logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class PlannerMemoryError(PlannerError):
     pass
 
 
-class OllamaPlanner:
+class OllamaPlanner(Planner):
     def __init__(
         self,
         model: str = "qwen2.5:3b",
@@ -72,32 +73,7 @@ class OllamaPlanner:
         self._session.trust_env = False
 
     def generate_plan(self, goal: str, screen_context: str = "", session_id: str | None = None) -> Plan:
-        try:
-            request = PlannerInput(goal=goal, screen_context=screen_context)
-        except ValidationError as exc:
-            raise PlannerValidationError("Planner input did not meet the required schema.") from exc
-
-        memory_context = []
-        if self.memory_store is not None:
-            if session_id is None or not session_id.strip():
-                raise PlannerValidationError("A non-blank session_id is required when memory is enabled.")
-            try:
-                memories = self.memory_store.search_memory(
-                    query=request.goal,
-                    session_id=session_id.strip(),
-                    limit=self.memory_limit,
-                )
-            except MemoryStoreError as exc:
-                raise PlannerMemoryError("Memory lookup failed.") from exc
-
-            if not isinstance(memories, list) or any(
-                not isinstance(memory, dict)
-                or not isinstance(memory.get("content"), str)
-                or len(memory["content"]) > 8_000
-                for memory in memories
-            ):
-                raise PlannerMemoryError("Memory store returned invalid results.")
-            memory_context = [{"content": memory["content"]} for memory in memories]
+        request, memory_context = self._prepare_request(goal, screen_context, session_id)
 
         prompt_data = {
             "goal": request.goal,

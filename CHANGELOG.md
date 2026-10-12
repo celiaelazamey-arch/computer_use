@@ -6,6 +6,8 @@ This project keeps **one current version** and no historical release line. `main
 
 ### Security
 
+- `cela.sh`: `sudo`, privilege-escalation tools (`doas`, `pkexec`, `su -`), shell commands (`rm -rf`, `bash -c`, `powershell -`, `cmd /c`, `chmod`, `chown`), and shell targets (`terminal`, `PowerShell`, `الطرفية`, `سطر الأوامر`) are now blocked uniformly across all action types (`TYPE`, `SEARCH_WEB`, `NAVIGATE`, `CLICK`, `OPEN_APP`, `OBSERVE`, `SCROLL`, `WAIT`, `ASK_USER`, `STOP`) and in the goal text, returning `status: blocked` with explicit guidance to run intended system commands manually in the user's own terminal.
+- `cela.sh`: extracted the abstract `Planner` interface (`cela_sh.planner.base`) and local planner provider registry (`register_planner_provider`, `build_planner`, `CELA_PLANNER_PROVIDER`) with shared `PlannerContract` enforcement, keeping `OllamaPlanner` as the default strictly local provider.
 - `cela.sh`: consequential verbs (send, submit, post, publish, upload, email, reply, share, message, order, checkout, subscribe, and their Arabic equivalents) now require confirmation instead of returning `ready` with `low` risk. Classification applies to the goal and to each step.
 - `ccelia2027`: each plan token can be executed once. Replays return 409 `plan_already_used` before any browser starts. Plan tokens issued before this change have no `jti` and are rejected. For a short window during deploy, users with unexpired old-format tokens get a 400 and must create a new plan.
 

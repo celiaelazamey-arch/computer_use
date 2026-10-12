@@ -111,13 +111,13 @@ git diff tests/snapshots/api_surface.json
 
 ## الوصفة 2: إضافة مزوّد تخطيط محلي آخر
 
-`OllamaPlanner` ليس واجهة مجردة بعد، لذا هذه التوسعة أكبر من الوصفة 1. الترتيب الآمن:
+واجهة `Planner` المجردة وسجلّ المزودين في `src/cela_sh/planner/registry.py` يعملان بالطريقة نفسها التي يعمل بها سجلّ الذاكرة:
 
-1. استخرج واجهة `Planner` (بعملية `generate_plan(goal, screen_context, session_id) -> Plan`) في وحدة جديدة، واجعل `OllamaPlanner` يطبّقها **دون تغيير توقيعه**.
-2. أضف المزوّد الجديد كتطبيق منفصل للواجهة.
-3. اجعل `create_planner` يختار عبر سجلّ مزودين بالطريقة نفسها التي يعمل بها سجلّ الذاكرة.
-4. ثبّت في الاختبارات أن كل مزوّد يعيد `Plan` تحمل `dry_run=True` و`execution_enabled=False`، ويرفض أي مخطط غير مطابق بدل إرجاع خطة بديلة.
-5. سجّل اللقطة.
+1. أنشئ صنفًا جديدًا يرث `Planner` ويطبّق `generate_plan(goal, screen_context, session_id) -> Plan` مع استخدام `_prepare_request` و`_finalize_plan` لضمان التحقق الصارم وتطبيق السياسة.
+2. سجّل المزوّد في `factory.py` (أو وحدة التوسعة) عبر `register_planner_provider("example-local", _build_example_planner)`. بذلك تصبح `CELA_PLANNER_PROVIDER=example-local` قيمة صالحة تلقائيًا، ويحقن `create_planner` مخزن الذاكرة المختار دون تعديل `settings.py` أو `factory.py`.
+3. أضف صنف اختبار يرث `PlannerContract` في `tests/test_extension_contracts.py` وأضف اسم المزوّد إلى `COVERED_PLANNER_PROVIDERS`.
+4. ثبّت في الاختبارات أن المزوّد يعيد `Plan` تحمل `dry_run=True` و`execution_enabled=False`، ويرفض أي مخطط غير مطابق بدل إرجاع خطة بديلة.
+5. سجّل اللقطة عبر `bash ./cela.sh api-surface --update`.
 
 لا تحذف `OllamaPlanner` ولا تغيّر أسماء أخطائه؛ الـ CLI يربط كل خطأ بكود خروج مُثبَّت في `EXIT_CODES`.
 
