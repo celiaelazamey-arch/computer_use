@@ -156,7 +156,7 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
 
     application = FastAPI(
         title="CELA.sh planning API",
-        version="1.0.0",
+        version="1.0.1",
         description="Local planning only: dry_run=true, execution_enabled=false. No authentication yet.",
         lifespan=lifespan,
     )
