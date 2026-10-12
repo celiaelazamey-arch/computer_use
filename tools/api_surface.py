@@ -161,6 +161,7 @@ def _cli_flags() -> list[dict[str, Any]]:
 def _python_surface() -> dict[str, Any]:
     cli = importlib.import_module("cela_sh.cli")
     registry = importlib.import_module("cela_sh.memory.registry")
+    planner_registry = importlib.import_module("cela_sh.planner.registry")
     exports: dict[str, Any] = {}
     package_exports: dict[str, list[str]] = {}
 
@@ -180,6 +181,8 @@ def _python_surface() -> dict[str, Any]:
         "exit_codes": dict(sorted(cli.EXIT_CODES.items())),
         "memory_backends": list(registry.memory_backend_names()),
         "builtin_memory_backends": sorted(registry.BUILTIN_MEMORY_BACKENDS),
+        "planner_providers": list(planner_registry.planner_provider_names()),
+        "builtin_planner_providers": sorted(planner_registry.BUILTIN_PLANNER_PROVIDERS),
     }
 
 
@@ -235,7 +238,11 @@ def summarise_drift(recorded: dict[str, Any], current: dict[str, Any]) -> list[s
     for flag in sorted(current_flags - recorded_flags):
         notes.append(f"ADDED CLI flag: {'/'.join(flag)}")
 
-    for key, label in (("exit_codes", "exit code"), ("memory_backends", "memory backend")):
+    for key, label in (
+        ("exit_codes", "exit code"),
+        ("memory_backends", "memory backend"),
+        ("planner_providers", "planner provider"),
+    ):
         before = recorded.get("python", {}).get(key, {})
         after = current.get("python", {}).get(key, {})
         if isinstance(before, dict):

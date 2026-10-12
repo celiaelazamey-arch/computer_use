@@ -30,6 +30,7 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from contract_memory_store import MemoryStoreContract  # noqa: E402
+from contract_planner import PlannerContract  # noqa: E402
 from fakes import DeterministicEmbedding, FakeQdrantSession  # noqa: E402
 
 from cela_sh import (  # noqa: E402
@@ -40,6 +41,7 @@ from cela_sh import (  # noqa: E402
     OllamaPlanner,
     Plan,
     PlanStatus,
+    Planner,
     QdrantMemoryStore,
     RiskLevel,
     Settings,
@@ -53,6 +55,14 @@ from cela_sh.memory import (  # noqa: E402
     registered_memory_backends,
     unregister_memory_backend,
 )
+from cela_sh.planner import (  # noqa: E402
+    build_planner,
+    is_known_planner_provider,
+    planner_provider_names,
+    register_planner_provider,
+    registered_planner_providers,
+    unregister_planner_provider,
+)
 from cela_sh.planner.models import PlannerInput, PlannedStep, RawPlan, RawStep  # noqa: E402
 from cela_sh.planner.policy import apply_policy  # noqa: E402
 
@@ -60,6 +70,9 @@ from cela_sh.planner.policy import apply_policy  # noqa: E402
 #: backend without adding it here fails
 #: ``test_every_registered_backend_is_covered_by_a_contract_suite``.
 COVERED_BACKENDS = frozenset({"qdrant", "example", "sqlite-vec"})
+
+#: Planner providers covered by a PlannerContract suite in this module.
+COVERED_PLANNER_PROVIDERS = frozenset({"ollama", "example-local"})
 
 OBSERVE_STEP = {
     "action": Action.OBSERVE,
@@ -289,6 +302,160 @@ class ExtensionPointTests(unittest.TestCase):
             [],
             f"Add a MemoryStoreContract suite for: {uncovered}. A backend that skips the "
             "shared contract can silently break session isolation.",
+        )
+
+
+DEFAULT_RAW_RESPONSE = (
+    '{"analysis": "Read a public page.", "steps": [{"action": "OBSERVE", "target": "page",'
+    ' "value": "", "reason": "Read it"}]}'
+)
+
+
+class ExampleLocalPlanner(Planner):
+    """A minimal local planner provider written the way a contributor would write one."""
+
+    def __init__(
+        self,
+        model: str = "example-local-model",
+        timeout: tuple[float, float] = (3.05, 60.0),
+        memory_store: MemoryStore | None = None,
+        memory_limit: int = 3,
+        raw_response: str | None = None,
+    ) -> None:
+        if not model.strip():
+            raise ValueError("model must not be blank")
+        self.model = model
+        self.timeout = timeout
+        self.memory_store = memory_store
+        self.memory_limit = memory_limit
+        self.raw_response = raw_response if raw_response is not None else DEFAULT_RAW_RESPONSE
+        self.seen_memories: list[dict[str, str]] = []
+
+    def generate_plan(self, goal: str, screen_context: str = "", session_id: str | None = None) -> Plan:
+        request, memory_context = self._prepare_request(goal, screen_context, session_id)
+        self.seen_memories = memory_context
+        return self._finalize_plan(self.raw_response, request)
+
+
+def _build_example_planner(
+    config: Settings,
+    timeout: tuple[float, float],
+    memory_store: MemoryStore | None = None,
+    model: str | None = None,
+) -> ExampleLocalPlanner:
+    return ExampleLocalPlanner(
+        model=model or config.planner_model,
+        timeout=timeout,
+        memory_store=memory_store,
+        memory_limit=config.memory_limit,
+    )
+
+
+class OllamaPlannerContractTests(PlannerContract, unittest.TestCase):
+    """Runs the shared planner contract against OllamaPlanner over an offline double."""
+
+    def make_planner(
+        self,
+        *,
+        memory_store: MemoryStore | None = None,
+        raw_response: str | None = None,
+    ) -> Any:
+        planner = OllamaPlanner(memory_store=memory_store)
+        self.addCleanup(planner._session.close)
+        payload = raw_response if raw_response is not None else DEFAULT_RAW_RESPONSE
+        response = mock.Mock(
+            status_code=200,
+            **{
+                "raise_for_status.return_value": None,
+                "json.return_value": {"response": payload},
+            },
+        )
+        patcher = mock.patch.object(planner._session, "post", return_value=response)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return planner
+
+
+class ExampleLocalPlannerContractTests(PlannerContract, unittest.TestCase):
+    def make_planner(
+        self,
+        *,
+        memory_store: MemoryStore | None = None,
+        raw_response: str | None = None,
+    ) -> Any:
+        return ExampleLocalPlanner(memory_store=memory_store, raw_response=raw_response)
+
+
+class PlannerExtensionPointTests(unittest.TestCase):
+    """Registering a local planner provider makes it usable end to end without editing factory/settings."""
+
+    def setUp(self) -> None:
+        register_planner_provider("example-local", _build_example_planner)
+        self.addCleanup(unregister_planner_provider, "example-local")
+
+    def test_a_registered_provider_becomes_a_valid_setting_value(self):
+        self.assertIn("example-local", planner_provider_names())
+        self.assertTrue(is_known_planner_provider("EXAMPLE-LOCAL"))
+        self.assertEqual(Settings(planner_provider="example-local").planner_provider, "example-local")
+
+    def test_an_unregistered_provider_is_rejected_and_names_the_valid_ones(self):
+        with self.assertRaises(ConfigurationError) as raised:
+            Settings(planner_provider="cloud-api")
+
+        message = str(raised.exception)
+        self.assertIn("'cloud-api'", message)
+        self.assertIn("'ollama'", message)
+
+    def test_the_factory_builds_a_registered_provider_and_injects_memory(self):
+        register_memory_backend("example", _build_example_store)
+        self.addCleanup(unregister_memory_backend, "example")
+        settings = Settings(
+            planner_provider="example-local",
+            planner_model="local-3b",
+            memory_backend="example",
+        )
+
+        planner = create_planner(settings, model="override-local")
+
+        self.assertIsInstance(planner, ExampleLocalPlanner)
+        self.assertEqual(planner.model, "override-local")
+        self.assertIsInstance(planner.memory_store, ExampleMemoryStore)
+
+    def test_registering_a_conflicting_provider_fails_loudly(self):
+        with self.assertRaises(ValueError):
+            register_planner_provider(
+                "example-local",
+                lambda config, timeout, memory_store=None, model=None: ExampleLocalPlanner(),
+            )
+        register_planner_provider("example-local", _build_example_planner)  # same builder is a no-op
+        with self.assertRaises(TypeError):
+            register_planner_provider("broken-provider", "not callable")
+        with self.assertRaises(ValueError):
+            register_planner_provider("   ", _build_example_planner)
+
+    def test_a_builder_that_returns_a_non_planner_is_rejected(self):
+        register_planner_provider(
+            "broken-provider",
+            lambda config, timeout, memory_store=None, model=None: {"not": "a planner"},
+            replace=True,
+        )
+        self.addCleanup(unregister_planner_provider, "broken-provider")
+
+        with self.assertRaises(TypeError):
+            build_planner("broken-provider", Settings(planner_provider="broken-provider"), (3.05, 60.0))
+
+    def test_an_unknown_provider_reports_the_known_names(self):
+        with self.assertRaises(ConfigurationError) as raised:
+            build_planner("cloud-api", Settings(), (3.05, 60.0))
+        self.assertIn("ollama", str(raised.exception))
+
+    def test_every_registered_planner_provider_is_covered_by_a_contract_suite(self):
+        uncovered = sorted(set(registered_planner_providers()) - COVERED_PLANNER_PROVIDERS)
+        self.assertEqual(
+            uncovered,
+            [],
+            f"Add a PlannerContract suite for: {uncovered}. A planner provider that skips "
+            "the shared contract can silently break dry-run or policy invariants.",
         )
 
 

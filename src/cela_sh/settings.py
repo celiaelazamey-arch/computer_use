@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 
 from .memory.registry import memory_backend_names
+from .planner.registry import planner_provider_names
 
 
 class ConfigurationError(ValueError):
@@ -57,10 +58,15 @@ class Settings:
     connect_timeout: float = 3.05
     read_timeout: float = 60.0
     allow_ollama_container_host: bool = False
+    planner_provider: str = "ollama"
 
     def __post_init__(self) -> None:
         if not isinstance(self.allow_ollama_container_host, bool):
             raise ConfigurationError("CELA_ALLOW_OLLAMA_CONTAINER_HOST must be a boolean.")
+        if not isinstance(self.planner_provider, str) or self.planner_provider not in planner_provider_names():
+            valid = ", ".join(f"'{name}'" for name in planner_provider_names())
+            given = repr(self.planner_provider[:40]) if isinstance(self.planner_provider, str) else repr(self.planner_provider)
+            raise ConfigurationError(f"CELA_PLANNER_PROVIDER {given} is not supported. Valid providers: {valid}.")
         if not self.ollama_url.strip():
             raise ConfigurationError("CELA_OLLAMA_URL must not be blank.")
         if not self.planner_model.strip() or not self.embedding_model.strip():
@@ -110,4 +116,5 @@ class Settings:
             connect_timeout=_positive_float("CELA_CONNECT_TIMEOUT", 3.05),
             read_timeout=_positive_float("CELA_READ_TIMEOUT", 60.0),
             allow_ollama_container_host=_boolean("CELA_ALLOW_OLLAMA_CONTAINER_HOST"),
+            planner_provider=os.environ.get("CELA_PLANNER_PROVIDER", "ollama").strip().lower(),
         )

@@ -12,6 +12,7 @@ class SettingsTests(unittest.TestCase):
             settings = Settings.from_env()
 
         self.assertEqual(settings.ollama_url, "http://127.0.0.1:11434")
+        self.assertEqual(settings.planner_provider, "ollama")
         self.assertEqual(settings.planner_model, "qwen2.5:3b")
         self.assertEqual(settings.memory_backend, "disabled")
         self.assertIsNone(settings.qdrant_api_key)
@@ -54,6 +55,7 @@ class SettingsTests(unittest.TestCase):
     def test_rejects_invalid_backend_and_nonpositive_timeouts(self):
         for env in (
             {"CELA_MEMORY_BACKEND": "redis"},
+            {"CELA_PLANNER_PROVIDER": "openai"},
             {"CELA_CONNECT_TIMEOUT": "0"},
             {"CELA_READ_TIMEOUT": "inf"},
             {"CELA_MEMORY_LIMIT": "-1"},

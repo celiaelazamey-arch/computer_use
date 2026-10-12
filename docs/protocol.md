@@ -17,9 +17,9 @@ bash ./cela.sh --goal "Find an article" [--context "..." ] [--model "..." ] [--s
 - `--model`: يتجاوز `CELA_PLANNER_MODEL` لهذه العملية فقط.
 - `--session-id`: مطلوب عند تفعيل أي مخزن ذاكرة (`qdrant` أو `sqlite-vec`).
 
-يقرأ البرنامج الإعدادات من بيئة العملية؛ لا يحمّل `.env` تلقائياً. تشمل المتغيرات `CELA_OLLAMA_URL`, `CELA_EMBEDDING_MODEL`, `CELA_MEMORY_BACKEND`, `CELA_QDRANT_URL`, `CELA_QDRANT_COLLECTION`, ومهل الاتصال. راجع `.env.example` للقيم الافتراضية.
+يقرأ البرنامج الإعدادات من بيئة العملية؛ لا يحمّل `.env` تلقائياً. تشمل المتغيرات `CELA_OLLAMA_URL`, `CELA_PLANNER_PROVIDER`, `CELA_PLANNER_MODEL`, `CELA_EMBEDDING_MODEL`, `CELA_MEMORY_BACKEND`, `CELA_QDRANT_URL`, `CELA_QDRANT_COLLECTION`, ومهل الاتصال. راجع `.env.example` للقيم الافتراضية.
 
-`CELA_SQLITE_VEC_PATH` يحدد ملف الذاكرة المحلية. `CELA_ALLOW_OLLAMA_CONTAINER_HOST` افتراضيًا `false` (قيم البيئة: true/false/1/0)؛ تفعيله يسمح باسم `ollama` فقط لشبكة Docker الموثوقة، لا بعناوين LAN أو خدمات أخرى. `allow_container_host=False` معامل keyword اختياري جديد لكلا عميلَي Ollama، دون تغيير الاستدعاءات الموضعية السابقة.
+`CELA_PLANNER_PROVIDER` يحدد مزوّد التخطيط المحلي (افتراضياً `ollama`)، ويُتحقق منه عبر `register_planner_provider(name, builder)` في `cela_sh.planner.registry`. `CELA_SQLITE_VEC_PATH` يحدد ملف الذاكرة المحلية. `CELA_ALLOW_OLLAMA_CONTAINER_HOST` افتراضيًا `false` (قيم البيئة: true/false/1/0)؛ تفعيله يسمح باسم `ollama` فقط لشبكة Docker الموثوقة، لا بعناوين LAN أو خدمات أخرى. `allow_container_host=False` معامل keyword اختياري جديد لكلا عميلَي Ollama، دون تغيير الاستدعاءات الموضعية السابقة.
 
 ## API محلية اختيارية
 
