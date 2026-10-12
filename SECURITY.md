@@ -14,7 +14,9 @@ This repository ships two components with deliberately different attack surfaces
 
 - Every plan carries `dry_run=true` and `execution_enabled=false`, enforced as `Literal` types rather than runtime flags.
 - There is no execution layer: no screen capture, no clicking, no typing, no shell commands.
-- Ollama is reachable only over loopback HTTP. Redirects are rejected and environment proxies are disabled (`trust_env = False`).
+- Ollama defaults to loopback HTTP. An explicit `CELA_ALLOW_OLLAMA_CONTAINER_HOST=true` exception permits exactly the `ollama` service on a trusted Docker network, not arbitrary LAN/public hosts. Redirects are rejected and environment proxies are disabled (`trust_env = False`).
+- The optional Python API is unauthenticated and Compose publishes it on host loopback only. Session IDs are selectors, not credentials: do not expose it to untrusted users before adding Auth/Z.
+- SQLite memory uses the official sqlite-vec extension with native session-prefiltered cosine KNN and a second session check at the metadata join. Writes and legacy migration are atomic; unusable vectors fail closed. Extension loading is disabled immediately after loading the packaged extension.
 - A remote Qdrant endpoint requires both HTTPS and an API key.
 - When memory is enabled, a `session_id` is mandatory, the filter is sent to the server **and** re-checked locally, and planning never writes to memory.
 - Retrieved memories and `screen_context` are untrusted data. The policy classifier is deterministic and independent of the model.
@@ -35,7 +37,7 @@ A report that demonstrates any of the above being broken is a security bug, not 
 
 - Prompt injection that produces an unwise **plan** while every listed boundary still holds. The plan is advice; `status: ready` is never an authorization to act, and no component executes it.
 - Keyword gaps in the deterministic risk classifier. It is documented as an initial classifier, not a complete one. Report a gap as an improvement unless it also defeats a boundary above.
-- Self-inflicted local configuration, such as publishing a Compose port off loopback or setting `CELA_QDRANT_URL` to a plaintext remote host. The adapter rejects the latter; the former is operator configuration.
+- Self-inflicted local configuration, such as exposing the unauthenticated API or publishing a Compose port off loopback, trusting a hostile Docker network, or setting `CELA_QDRANT_URL` to a plaintext remote host. The adapter rejects the latter; the former is operator configuration.
 - Findings in third-party services (Ollama, Qdrant, Cloudflare Workers AI, Browser Run) that are not caused by this code.
 
 ## Disclosure

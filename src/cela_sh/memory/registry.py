@@ -27,12 +27,14 @@ BUILTIN_MEMORY_BACKENDS = frozenset({DISABLED_BACKEND, "qdrant", "sqlite-vec"})
 class MemoryBackendSettings(Protocol):
     """The settings fields a backend builder is allowed to read."""
 
+    allow_ollama_container_host: bool
     embedding_model: str
     memory_limit: int
     ollama_url: str
     qdrant_api_key: str | None
     qdrant_collection: str
     qdrant_url: str
+    sqlite_vec_path: str
 
 
 MemoryBackendBuilder = Callable[[MemoryBackendSettings, tuple[float, float]], MemoryStore]

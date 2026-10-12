@@ -33,6 +33,70 @@ jobs:
       - run: python tools/api_surface.py --check
       - run: python -m pip wheel --no-deps --wheel-dir "${RUNNER_TEMP}/cela-sh-wheels" .
 
+  verify-containers:
+    name: verify API container (no models)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate Compose configuration
+        run: docker compose --profile api --profile memory config --quiet
+      - name: Build the installed runtime image
+        run: docker build --target runtime --tag cela-sh-api:ci .
+      - name: Exercise native vec0 as the unprivileged runtime user
+        run: |
+          docker run --rm --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges:true --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --volume cela-api-ci-data:/app/data cela-sh-api:ci python -c '
+          import os
+          from types import SimpleNamespace
+          from cela_sh import SqliteVecMemoryStore
+          assert os.getuid() == 10001
+          store = SqliteVecMemoryStore("/app/data/smoke.db", SimpleNamespace(embed=lambda text: [1.0, 0.0]))
+          assert store.add_memory("ci-session", "native vec0 smoke test")
+          result = store.search_memory("query", "ci-session")[0]
+          assert result["content"] == "native vec0 smoke test" and result["score"] == 1.0
+          assert store.search_memory("query", "other-session") == []
+          '
+      - name: Check API startup and liveness without Ollama
+        run: |
+          docker run -d --name cela-sh-api-ci --read-only --cap-drop=ALL \
+            --security-opt=no-new-privileges:true --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --volume cela-api-ci-data:/app/data \
+            --publish 127.0.0.1:8000:8000 cela-sh-api:ci
+          # Docker's port proxy accepts connections before uvicorn binds and then
+          # resets them. curl --retry-connrefused does not retry resets or empty
+          # replies, so poll explicitly and stop early if the container exits.
+          health=""
+          for attempt in $(seq 1 60); do
+            if [[ "$(docker inspect --format '{{.State.Running}}' cela-sh-api-ci)" != "true" ]]; then
+              echo "::error::API container exited before becoming healthy."
+              exit 1
+            fi
+            if health="$(curl --fail --silent --show-error --max-time 3 http://127.0.0.1:8000/health 2>/dev/null)"; then
+              echo "API responded after ${attempt} attempt(s)."
+              break
+            fi
+            health=""
+            sleep 1
+          done
+          if [[ -z "$health" ]]; then
+            echo "::error::API /health did not respond within 60 seconds."
+            exit 1
+          fi
+          HEALTH="$health" python -c '
+          import json, os
+          h = json.loads(os.environ["HEALTH"])
+          expected = {"status": "ok", "memory_backend": "sqlite-vec", "dry_run": True, "execution_enabled": False}
+          assert h == expected, f"unexpected /health payload: {h!r}"
+          print("API liveness payload verified.")
+          '
+      - name: Container logs and cleanup
+        if: always()
+        run: |
+          docker logs cela-sh-api-ci || true
+          docker rm -f cela-sh-api-ci || true
+
   verify:
     name: verify Worker
     runs-on: ubuntu-latest

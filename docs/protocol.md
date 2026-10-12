@@ -2,7 +2,7 @@
 
 **الإصدار:** 1.0.0
 
-**النقل:** HTTP محلي إلى Ollama، ثم JSON إلى stdout
+**النقل:** HTTP محلي إلى Ollama، ثم JSON إلى stdout أو API محلية اختيارية
 
 **الوضع:** تخطيط فقط؛ لا تنفيذ
 
@@ -15,9 +15,15 @@ bash ./cela.sh --goal "Find an article" [--context "..." ] [--model "..." ] [--s
 - `--goal`: مطلوب، من 1 إلى 2,000 حرف.
 - `--context`: سياق نصي اختياري، حتى 8,000 حرف.
 - `--model`: يتجاوز `CELA_PLANNER_MODEL` لهذه العملية فقط.
-- `--session-id`: مطلوب عند ضبط `CELA_MEMORY_BACKEND=qdrant`.
+- `--session-id`: مطلوب عند تفعيل أي مخزن ذاكرة (`qdrant` أو `sqlite-vec`).
 
 يقرأ البرنامج الإعدادات من بيئة العملية؛ لا يحمّل `.env` تلقائياً. تشمل المتغيرات `CELA_OLLAMA_URL`, `CELA_EMBEDDING_MODEL`, `CELA_MEMORY_BACKEND`, `CELA_QDRANT_URL`, `CELA_QDRANT_COLLECTION`, ومهل الاتصال. راجع `.env.example` للقيم الافتراضية.
+
+`CELA_SQLITE_VEC_PATH` يحدد ملف الذاكرة المحلية. `CELA_ALLOW_OLLAMA_CONTAINER_HOST` افتراضيًا `false` (قيم البيئة: true/false/1/0)؛ تفعيله يسمح باسم `ollama` فقط لشبكة Docker الموثوقة، لا بعناوين LAN أو خدمات أخرى. `allow_container_host=False` معامل keyword اختياري جديد لكلا عميلَي Ollama، دون تغيير الاستدعاءات الموضعية السابقة.
+
+## API محلية اختيارية
+
+تُثبت بـ`pip install -e '.[server]'` أو عبر `Dockerfile`. مسارات `/plan` و`/memory` و`/memory/search` موثقة في [دليل Docker](docker-deployment.md) و`/openapi.json`. الخطة نفس `Plan` المقفلة على dry-run. الذاكرة تُكتب صراحة بـPOST فقط، والبحث معزول بالجلسة. `/health` فحص حياة، لا جاهزية نموذج. لا يوجد Auth/Z أو rate limiting بعد؛ لا تنشرها على شبكة غير موثوقة.
 
 ## الذاكرة
 
@@ -25,10 +31,12 @@ bash ./cela.sh --goal "Find an article" [--context "..." ] [--model "..." ] [--s
 - تُسجَّل المخازن عبر `register_memory_backend(name, builder)` في `cela_sh.memory.registry`، وهذا السجل هو مصدر الحقيقة لقيم `CELA_MEMORY_BACKEND` المقبولة؛ الخطأ في قيمة غير مدعومة يسمّي القيم الصالحة.
 - `MockMemoryStore` مخزن مؤقت معجمي للاختبار، وليس بحثاً دلالياً.
 - `QdrantMemoryStore` يستخدم REST. تنشأ المجموعة عند أول إضافة، بحجم embedding المكتشف ومسافة `Cosine`، ويرفض اختلاف الحجم.
-- Qdrant معطل افتراضياً. عند تفعيله، يفرض `session_id` في استعلام Qdrant ويتحقق منه محلياً قبل إعادة النتائج.
-- `OllamaEmbeddingProvider` يستدعي `POST /api/embed` مع `model` و`input`.
+- الذاكرة معطلة افتراضياً في CLI/Python. عند تفعيلها، يفرض `session_id` في استعلام المخزن ويتحقق منه محلياً قبل إعادة النتائج. حاوية API تفعّل sqlite-vec صراحة.
+- `SqliteVecMemoryStore` يستخدم مكتبة sqlite-vec الرسمية، و`vec_memories_<dimension>` بمسافة cosine وعمود metadata لترشيح الجلسة. `MATCH` مع `k` ومرشح الجلسة يجري البحث داخل الامتداد قبل top-k؛ ترحيل القواعد القديمة والكتابة ذريّان.
+- نتيجة الذاكرة تحفظ مفاتيح `session_id`, `content`, `metadata`, `score` فقط. cosine similarity هي `1 - distance` ضمن `[-1, 1]`؛ حد vec0 الأصلي 4096 نتيجة، وحد HTTP هو 100. الأبعاد المختلفة لا تختلط في البحث.
+- `OllamaEmbeddingProvider.embed(text)` يستدعي `POST /api/embed` مع `model` و`input` كنص واحد.
 - المخطط لا يكتب ذكريات تلقائياً. يظل `add_memory` واجهة صريحة للمستدعي.
-- Ollama محلي على loopback. Qdrant البعيد يتطلب HTTPS ومفتاح API، ولا تحفظ المفتاح في المستودع.
+- Ollama على loopback أو الخدمة الداخلية المسموح بها صراحة. Qdrant البعيد يتطلب HTTPS ومفتاح API، ولا تحفظ المفتاح في المستودع.
 
 ## مخطط الخطة
 
@@ -66,7 +74,7 @@ bash ./cela.sh --goal "Find an article" [--context "..." ] [--model "..." ] [--s
 |   `3` | تعذر الاتصال بـ Ollama أو انتهت المهلة |
 |   `4` | استجابة HTTP أو JSON غير صالحة         |
 |   `5` | مدخل أو خطة لا تطابق المخطط            |
-|   `6` | خطأ استرجاع أو اتصال الذاكرة           |
+|   `6` | خطأ تهيئة أو استرجاع أو اتصال الذاكرة  |
 | `130` | أوقف المستخدم العملية                  |
 
-الاختبارات تستخدم mocks؛ نجاحها لا يثبت تشغيل الخدمات. `tests/integration_plan_probe.py` يولد خطة عبر Ollama المحلي، و`tests/integration_live_probe.py` يفحص الذاكرة وQdrant اختيارياً.
+اختبارات SQLite تستخدم امتداد vec0 الحقيقي مع embeddings حتمية؛ بدائل HTTP للـAPI وQdrant وOllama تبقى offline. نجاحها لا يثبت جاهزية الخدمات والنماذج الحية. `tests/integration_plan_probe.py` يولد خطة عبر Ollama المحلي، و`tests/integration_live_probe.py` يفحص الذاكرة وQdrant اختيارياً.

@@ -17,9 +17,9 @@
 
 ## المكوّن المحلي
 
-الحزمة `cela-sh` تعمل عبر `bash ./cela.sh` أو `python -m cela_sh`. تستخدم Ollama على loopback، وتسمح بـQdrant اختياري مع عزل الجلسات. المخطط والسياسة يصنفان الأفعال، لكن لا توجد طبقة تنفيذ أو تحكم بالواجهة. كل خطة تحمل `dry_run=true` و`execution_enabled=false`؛ و`ready` لا يعني إذنًا بالفعل.
+الحزمة `cela-sh` تعمل عبر `bash ./cela.sh` أو `python -m cela_sh` أو API اختيارية. تستخدم Ollama على loopback افتراضيًا، أو اسم خدمة Docker `ollama` عند السماح الصريح؛ وتسمح بـsqlite-vec الرسمي أو Qdrant مع عزل الجلسات. المخطط والسياسة يصنفان الأفعال، لكن لا توجد طبقة تنفيذ أو تحكم بالواجهة. كل خطة تحمل `dry_run=true` و`execution_enabled=false`؛ و`ready` لا يعني إذنًا بالفعل.
 
-الاختبارات في `tests/` تستخدم بدائل حتمية ولا تحتاج Ollama أو Qdrant. `bash ./cela.sh probe` و`probe-memory` فحوص حية اختيارية ويجب تشغيلهما صراحةً على الجهاز المقصود.
+الاختبارات في `tests/` تستخدم embeddings حتمية مع vec0 الحقيقي، وبدائل HTTP؛ لا تحتاج Ollama أو Qdrant. الصورة متعددة المراحل تشغّل API كمستخدم غير root، وتنشرها على loopback فقط دون مصادقة بعد؛ التفاصيل في [دليل Docker](docker-deployment.md). `bash ./cela.sh probe` و`probe-memory` فحوص حية اختيارية ويجب تشغيلهما صراحةً على الجهاز المقصود.
 
 ## المكوّن المستضاف
 
@@ -32,7 +32,7 @@
 - Python لا يرسل بياناته إلى Worker، وWorker لا يتصل بخدمة Ollama المحلية.
 - أسرار Cloudflare وبيانات التطبيق تخص GitHub Actions/Cloudflare فقط، ولا تدخل بيئة Python.
 - نص الهدف والسياق والذاكرة غير موثوق. الخطة تحتاج تحققًا وقاعدة رفض مستقلة عن النموذج.
-- Qdrant اختياري ويحتوي ذاكرة جلسة فقط عند تفعيله. Worker Durable Object يحتفظ بعدادات الاستخدام اليومية لا بنص المهام.
+- SQLite/Qdrant يحتويان ذاكرة جلسة عند التفعيل والكتابة الصريحة فقط. Worker Durable Object يحتفظ بعدادات الاستخدام اليومية لا بنص المهام.
 - اختبارات CI لا تشغّل Ollama أو Browser Run أو NVIDIA ولا تنشر الإنتاج.
 
 ## تشغيل وصيانة موحّدان
@@ -45,7 +45,7 @@ bash ./cela.sh check-all
 bash ./cela.sh worker-dev
 ```
 
-`check-all` يشغّل اختبارات Python وبناء الحزمة، واختبارات Worker وLint والتنسيق وتدقيق npm وبناء Wrangler التجريبي. CI يشغّل الفحوص نفسها في مهمتين متوازيتين بعد تثبيت الاعتماديات. CodeQL يفحص JavaScript/Python، وDependabot يغطي pip وnpm وGitHub Actions. سير النشر منفصل ويدوي، ولا يعمل تلقائيًا عند push.
+`check-all` يشغّل اختبارات Python وبناء الحزمة، واختبارات Worker وLint والتنسيق وتدقيق npm وبناء Wrangler التجريبي. CI يشغّل فحوص Python وWorker في مهمتين متوازيتين، وفحصًا إضافيًا لبناء حاوية API وعمل vec0 وفحص الحياة دون نماذج حية. CodeQL يفحص JavaScript/Python، وDependabot يغطي pip وnpm وGitHub Actions. سير النشر منفصل ويدوي، ولا يعمل تلقائيًا عند push.
 
 ## طبقة حماية التوسعة
 

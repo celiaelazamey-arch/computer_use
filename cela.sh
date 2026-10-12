@@ -158,13 +158,20 @@ case "${1:-}" in
     docker compose --profile memory up -d ollama qdrant
     exit 0
     ;;
+  services-up-api)
+    if ! command -v docker >/dev/null 2>&1; then
+      printf 'Docker Compose is required for the local API.\n' >&2
+      exit 2
+    fi
+    docker compose --profile api up -d --build cela-sh-api
+    exit 0
+    ;;
   services-stop)
     if ! command -v docker >/dev/null 2>&1; then
       printf 'Docker Compose is required to stop local services.\n' >&2
       exit 2
     fi
-    docker compose stop ollama
-    docker compose --profile memory stop qdrant
+    docker compose --profile api --profile memory stop
     exit 0
     ;;
   probe)

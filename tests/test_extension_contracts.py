@@ -160,7 +160,7 @@ class ExampleMemoryStoreContractTests(MemoryStoreContract, unittest.TestCase):
 
 
 class SqliteVecMemoryStoreContractTests(MemoryStoreContract, unittest.TestCase):
-    """Runs the shared contract against the sqlite-vec backend with a deterministic embedding."""
+    """Runs the shared contract against real vec0 with a deterministic embedding."""
 
     def make_store(self) -> Any:
         import tempfile
@@ -168,8 +168,9 @@ class SqliteVecMemoryStoreContractTests(MemoryStoreContract, unittest.TestCase):
 
         from cela_sh.memory import SqliteVecMemoryStore
 
-        temp_dir = tempfile.mkdtemp()
-        db_path = Path(temp_dir) / "test_memory.db"
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        db_path = Path(temp_dir.name) / "test_memory.db"
 
         return SqliteVecMemoryStore(
             db_path=str(db_path),

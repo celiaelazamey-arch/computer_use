@@ -165,10 +165,10 @@
         "bases": [
           "cela_sh.memory.embeddings.EmbeddingProvider"
         ],
-        "init": "(self, model: str = 'nomic-embed-text', base_url: str = 'http://127.0.0.1:11434', timeout: tuple[float, float] = (3.05, 60.0)) -> None",
+        "init": "(self, model: str = 'nomic-embed-text', base_url: str = 'http://127.0.0.1:11434', timeout: tuple[float, float] = (3.05, 60.0), *, allow_container_host: bool = False) -> None",
         "kind": "class",
         "methods": {
-          "__init__": "(self, model: str = 'nomic-embed-text', base_url: str = 'http://127.0.0.1:11434', timeout: tuple[float, float] = (3.05, 60.0)) -> None",
+          "__init__": "(self, model: str = 'nomic-embed-text', base_url: str = 'http://127.0.0.1:11434', timeout: tuple[float, float] = (3.05, 60.0), *, allow_container_host: bool = False) -> None",
           "embed": "(self, text: str) -> list[float]"
         }
       },
@@ -176,10 +176,10 @@
         "bases": [
           "builtins.object"
         ],
-        "init": "(self, model: str = 'qwen2.5:3b', timeout: tuple[float, float] = (3.05, 60.0), memory_store: cela_sh.memory.base.MemoryStore | None = None, memory_limit: int = 3, base_url: str = 'http://127.0.0.1:11434')",
+        "init": "(self, model: str = 'qwen2.5:3b', timeout: tuple[float, float] = (3.05, 60.0), memory_store: cela_sh.memory.base.MemoryStore | None = None, memory_limit: int = 3, base_url: str = 'http://127.0.0.1:11434', *, allow_container_host: bool = False)",
         "kind": "class",
         "methods": {
-          "__init__": "(self, model: str = 'qwen2.5:3b', timeout: tuple[float, float] = (3.05, 60.0), memory_store: cela_sh.memory.base.MemoryStore | None = None, memory_limit: int = 3, base_url: str = 'http://127.0.0.1:11434')",
+          "__init__": "(self, model: str = 'qwen2.5:3b', timeout: tuple[float, float] = (3.05, 60.0), memory_store: cela_sh.memory.base.MemoryStore | None = None, memory_limit: int = 3, base_url: str = 'http://127.0.0.1:11434', *, allow_container_host: bool = False)",
           "generate_plan": "(self, goal: str, screen_context: str = '', session_id: str | None = None) -> cela_sh.planner.models.Plan"
         }
       },
@@ -302,6 +302,10 @@
           "builtins.object"
         ],
         "fields": {
+          "allow_ollama_container_host": {
+            "annotation": "bool",
+            "required": false
+          },
           "connect_timeout": {
             "annotation": "float",
             "required": false
@@ -347,10 +351,10 @@
             "required": false
           }
         },
-        "init": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None",
+        "init": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0, allow_ollama_container_host: bool = False) -> None",
         "kind": "class",
         "methods": {
-          "__init__": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0) -> None"
+          "__init__": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0, allow_ollama_container_host: bool = False) -> None"
         }
       },
       "SqliteVecMemoryStore": {
