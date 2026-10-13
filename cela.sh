@@ -23,6 +23,7 @@ prettier_check_root_docs() {
       ../CONTRIBUTING.md \
       ../SECURITY.md \
       ../docs/*.md \
+      ../docs/development/*.md \
       ../.github/dependabot.yml \
       ../.github/workflows/*.yml \
       ../.github/PULL_REQUEST_TEMPLATE.md \
