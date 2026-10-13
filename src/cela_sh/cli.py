@@ -59,7 +59,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] in (["learn"], ["learn-file"], ["search"]):
+        from .learning_cli import main as memory_main
+
+        return memory_main(arguments)
+
+    args = build_parser().parse_args(arguments)
 
     try:
         settings = Settings.from_env()

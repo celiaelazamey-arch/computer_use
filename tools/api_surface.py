@@ -9,7 +9,7 @@ contracts rather than implementation:
 * every name exported from ``cela_sh`` and its subpackages, with signatures,
   Enum members, and Pydantic model fields (including the ``Literal`` locks that
   keep plans ``dry_run=true`` and ``execution_enabled=false``);
-* the CLI flag surface and the exit-code table;
+* the CLI flag surfaces (including the explicit-learning subcommand) and exit-code table;
 * the registered memory backend names;
 * the Worker's exported symbols and HTTP route table.
 
@@ -142,8 +142,9 @@ def _describe(qualified_name: str, target: Any) -> dict[str, Any]:
     return {"kind": type(target).__name__, "value": repr(target)}
 
 
-def _cli_flags() -> list[dict[str, Any]]:
-    parser = importlib.import_module("cela_sh.cli").build_parser()
+def _cli_flags(parser: argparse.ArgumentParser | None = None) -> list[dict[str, Any]]:
+    if parser is None:
+        parser = importlib.import_module("cela_sh.cli").build_parser()
     flags = []
     for action in parser._actions:  # noqa: SLF001 - argparse exposes no public accessor
         flags.append(
@@ -160,6 +161,7 @@ def _cli_flags() -> list[dict[str, Any]]:
 
 def _python_surface() -> dict[str, Any]:
     cli = importlib.import_module("cela_sh.cli")
+    learning_cli = importlib.import_module("cela_sh.learning_cli")
     registry = importlib.import_module("cela_sh.memory.registry")
     planner_registry = importlib.import_module("cela_sh.planner.registry")
     exports: dict[str, Any] = {}
@@ -178,6 +180,11 @@ def _python_surface() -> dict[str, Any]:
         "exports": exports,
         "package_exports": package_exports,
         "cli_flags": _cli_flags(),
+        "cli_subcommands": {
+            "learn": _cli_flags(learning_cli.build_parser()),
+            "learn-file": _cli_flags(learning_cli.build_file_parser()),
+            "search": _cli_flags(learning_cli.build_search_parser()),
+        },
         "exit_codes": dict(sorted(cli.EXIT_CODES.items())),
         "memory_backends": list(registry.memory_backend_names()),
         "builtin_memory_backends": sorted(registry.BUILTIN_MEMORY_BACKENDS),
@@ -231,12 +238,24 @@ def summarise_drift(recorded: dict[str, Any], current: dict[str, Any]) -> list[s
         if recorded_exports[name] != current_exports[name]:
             notes.append(f"CHANGED public name: {name}")
 
-    recorded_flags = {tuple(flag["options"]) for flag in recorded.get("python", {}).get("cli_flags", [])}
-    current_flags = {tuple(flag["options"]) for flag in current.get("python", {}).get("cli_flags", [])}
-    for flag in sorted(recorded_flags - current_flags):
-        notes.append(f"REMOVED CLI flag: {'/'.join(flag)}")
-    for flag in sorted(current_flags - recorded_flags):
-        notes.append(f"ADDED CLI flag: {'/'.join(flag)}")
+    recorded_python = recorded.get("python", {})
+    current_python = current.get("python", {})
+    recorded_modes = {"default": recorded_python.get("cli_flags", [])}
+    current_modes = {"default": current_python.get("cli_flags", [])}
+    recorded_modes.update(recorded_python.get("cli_subcommands", {}))
+    current_modes.update(current_python.get("cli_subcommands", {}))
+    for mode in sorted(set(recorded_modes) - set(current_modes)):
+        notes.append(f"REMOVED CLI subcommand: {mode}")
+    for mode in sorted(set(current_modes) - set(recorded_modes)):
+        notes.append(f"ADDED CLI subcommand: {mode}")
+    for mode in sorted(set(recorded_modes) & set(current_modes)):
+        recorded_flags = {tuple(flag["options"]) for flag in recorded_modes[mode]}
+        current_flags = {tuple(flag["options"]) for flag in current_modes[mode]}
+        label = "CLI flag" if mode == "default" else f"CLI {mode} flag"
+        for flag in sorted(recorded_flags - current_flags):
+            notes.append(f"REMOVED {label}: {'/'.join(flag)}")
+        for flag in sorted(current_flags - recorded_flags):
+            notes.append(f"ADDED {label}: {'/'.join(flag)}")
 
     for key, label in (
         ("exit_codes", "exit code"),

@@ -39,8 +39,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Validate Compose configuration
+      - name: Validate local Compose configuration
         run: docker compose --profile api --profile memory config --quiet
+      - name: Validate cloud Compose overlay with a disposable fixture key
+        env:
+          CELA_API_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+        run: docker compose -f docker-compose.yml -f docker-compose.cloud.yml --profile api config --quiet
       - name: Build the installed runtime image
         run: docker build --target runtime --tag cela-sh-api:ci .
       - name: Exercise native vec0 as the unprivileged runtime user

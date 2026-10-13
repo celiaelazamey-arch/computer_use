@@ -1,6 +1,6 @@
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .memory.registry import memory_backend_names
 from .planner.registry import planner_provider_names
@@ -54,11 +54,12 @@ class Settings:
     sqlite_vec_path: str = "cela_memory.db"
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "agent_memory"
-    qdrant_api_key: str | None = None
+    qdrant_api_key: str | None = field(default=None, repr=False)
     connect_timeout: float = 3.05
     read_timeout: float = 60.0
     allow_ollama_container_host: bool = False
     planner_provider: str = "ollama"
+    api_key: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.allow_ollama_container_host, bool):
@@ -83,6 +84,14 @@ class Settings:
             raise ConfigurationError("CELA_SQLITE_VEC_PATH must not be blank when sqlite-vec backend is enabled.")
         if self.qdrant_api_key is not None and not self.qdrant_api_key.strip():
             raise ConfigurationError("CELA_QDRANT_API_KEY must not be blank when set.")
+        if self.api_key is not None and (
+            not isinstance(self.api_key, str)
+            or len(self.api_key) < 32
+            or not self.api_key.isascii()
+            or not self.api_key.isprintable()
+            or any(character.isspace() for character in self.api_key)
+        ):
+            raise ConfigurationError("CELA_API_KEY must be an ASCII bearer token of at least 32 characters.")
         if isinstance(self.memory_limit, bool) or not isinstance(self.memory_limit, int) or self.memory_limit < 1:
             raise ConfigurationError("Memory limit must be a positive integer.")
         if (
@@ -102,7 +111,8 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        api_key = os.environ.get("CELA_QDRANT_API_KEY")
+        qdrant_api_key = os.environ.get("CELA_QDRANT_API_KEY")
+        api_key = os.environ.get("CELA_API_KEY")
         return cls(
             ollama_url=os.environ.get("CELA_OLLAMA_URL", "http://127.0.0.1:11434").strip(),
             planner_model=os.environ.get("CELA_PLANNER_MODEL", "qwen2.5:3b").strip(),
@@ -112,9 +122,10 @@ class Settings:
             sqlite_vec_path=os.environ.get("CELA_SQLITE_VEC_PATH", "cela_memory.db").strip(),
             qdrant_url=os.environ.get("CELA_QDRANT_URL", "http://127.0.0.1:6333").strip(),
             qdrant_collection=os.environ.get("CELA_QDRANT_COLLECTION", "agent_memory").strip(),
-            qdrant_api_key=api_key.strip() if api_key and api_key.strip() else None,
+            qdrant_api_key=qdrant_api_key.strip() if qdrant_api_key and qdrant_api_key.strip() else None,
             connect_timeout=_positive_float("CELA_CONNECT_TIMEOUT", 3.05),
             read_timeout=_positive_float("CELA_READ_TIMEOUT", 60.0),
             allow_ollama_container_host=_boolean("CELA_ALLOW_OLLAMA_CONTAINER_HOST"),
             planner_provider=os.environ.get("CELA_PLANNER_PROVIDER", "ollama").strip().lower(),
+            api_key=api_key if api_key else None,
         )

@@ -1,10 +1,10 @@
 # عقد أخطاء API في cela.sh
 
-**الإصدار:** 1.0.1
+**الإصدار:** 1.0.2
 
-**الحالة:** مرجع وحيد. هذا الملف هو مصدر الحقيقة لعقد أخطاء API المحلية؛ بقية الوثائق تشير إليه ولا تعيد سرد جداوله.
+**الحالة:** مرجع وحيد. هذا الملف هو مصدر الحقيقة لعقد أخطاء API المحلية/السحابية؛ بقية الوثائق تشير إليه ولا تعيد سرد جداوله.
 
-**النطاق:** خدمة `cela-sh-api` في `src/cela_sh/server.py` (المسارات `/health` و`/plan` و`/memory` و`/memory/search`). لا يشمل Worker في `ccelia2027/`، فهو تطبيق مستقل بسطح أخطاء خاص به.
+**النطاق:** خدمة `cela-sh-api` في `src/cela_sh/server.py` (المسارات `/health` و`/plan` و`/memory` و`/memory/search`)، بما فيها المصادقة الاختيارية برمز Bearer. لا يشمل Worker في `ccelia2027/`، فهو تطبيق مستقل بسطح أخطاء خاص به.
 
 **طريقة التوثيق:** كل صف في الجدولين أدناه مُتحقَّق منه بتشغيل التطبيق فعليًا، لا بقراءة الكود فقط. أوامر إعادة التحقق في [ملحق التحقق](#ملحق-التحقق).
 
@@ -14,31 +14,32 @@
 
 هذا هو البند الأهم في العقد، وهو الذي يُساء نقله عادةً. API تعيد **غلافين مختلفين** حسب مصدر الخطأ:
 
-| الغلاف                | الشكل                                          | المصدر                                                                                                           |
-| --------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **أ** — أخطاء التطبيق | `{"error": {"code": "...", "message": "..."}}` | أعطال النطاق المعروفة (المخطط، الذاكرة) والاستثناءات غير المتوقعة. كل `message` جملة ثابتة مكتوبة في الكود.      |
-| **ب** — أخطاء الإطار  | `{"detail": ...}`                              | تحقق FastAPI/Pydantic من جسم الطلب، والمسارات غير الموجودة، والطريقة غير المسموحة. لا `code` ولا جملة ثابتة هنا. |
+| الغلاف                | الشكل                                          | المصدر                                                                                                                |
+| --------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **أ** — أخطاء التطبيق | `{"error": {"code": "...", "message": "..."}}` | المصادقة وأعطال النطاق المعروفة (المخطط، الذاكرة) والاستثناءات غير المتوقعة. كل `message` جملة ثابتة مكتوبة في الكود. |
+| **ب** — أخطاء الإطار  | `{"detail": ...}`                              | تحقق FastAPI/Pydantic من جسم الطلب، والمسارات غير الموجودة، والطريقة غير المسموحة. لا `code` ولا جملة ثابتة هنا.      |
 
 النتيجة العملية للمستهلك: **افحص الغلاف قبل أن تفترض `code`.** خطأ إدخال في جسم الطلب يعيد `422` بغلاف `detail`، بينما فشل تحقق داخل المخطط يعيد `422` بغلاف `error`. الحالة وحدها لا تكفي للتمييز.
 
-كلا الغلافين `application/json`. لا يوجد مسار يعيد نصًا عاديًا (`text/plain`) أو HTML.
+كلا غلافي الخطأ `application/json`؛ لا تُعاد أخطاء API كنص عادي أو HTML. صفحة Swagger (`/docs`) نفسها تبقى HTML عامة.
 
 ---
 
 ## الجدول أ — أخطاء التطبيق (غلاف `error`)
 
-| الحالة | `code`                     | `message` الثابتة                               | المسار                      | المحفّز                                                 |
-| -----: | -------------------------- | ----------------------------------------------- | --------------------------- | ------------------------------------------------------- |
-|    409 | `memory_disabled`          | `Memory is disabled in this deployment.`        | `/memory`, `/memory/search` | الذاكرة غير مهيّئة في هذا النشر                         |
-|    422 | `planner_validation_error` | `Planner input validation failed.`              | `/plan`                     | `PlannerValidationError`                                |
-|    422 | `memory_validation_error`  | `Invalid memory input.`                         | `/memory`                   | `ValueError` من مخزن الذاكرة                            |
-|    422 | `memory_validation_error`  | `Invalid memory search input.`                  | `/memory/search`            | `ValueError` من مخزن الذاكرة                            |
-|    500 | `planner_error`            | `An internal planner error occurred.`           | `/plan`                     | أي `PlannerError` غير مصنَّف أعلاه                      |
-|    500 | `internal_error`           | `Internal server error.`                        | أي مسار HTTP                | استثناء غير متوقع (الوسيطة `UnexpectedErrorMiddleware`) |
-|    502 | `planner_response_error`   | `Planner service returned an invalid response.` | `/plan`                     | `PlannerResponseError` — رد Ollama غير صالح             |
-|    503 | `planner_connection_error` | `Unable to connect to planner service.`         | `/plan`                     | `PlannerConnectionError` — تعذّر الوصول إلى Ollama      |
-|    503 | `planner_memory_error`     | `Planner memory backend is unavailable.`        | `/plan`                     | `PlannerMemoryError`                                    |
-|    503 | `memory_store_error`       | `Memory store is unavailable.`                  | `/memory`, `/memory/search` | `MemoryStoreError`                                      |
+| الحالة | `code`                     | `message` الثابتة                               | المسار                               | المحفّز                                                 |
+| -----: | -------------------------- | ----------------------------------------------- | ------------------------------------ | ------------------------------------------------------- |
+|    401 | `authentication_required`  | `A valid bearer token is required.`             | `/plan`, `/memory`, `/memory/search` | `CELA_API_KEY` مفعّل والرمز مفقود أو غير صحيح           |
+|    409 | `memory_disabled`          | `Memory is disabled in this deployment.`        | `/memory`, `/memory/search`          | الذاكرة غير مهيّئة في هذا النشر                         |
+|    422 | `planner_validation_error` | `Planner input validation failed.`              | `/plan`                              | `PlannerValidationError`                                |
+|    422 | `memory_validation_error`  | `Invalid memory input.`                         | `/memory`                            | `ValueError` من مخزن الذاكرة                            |
+|    422 | `memory_validation_error`  | `Invalid memory search input.`                  | `/memory/search`                     | `ValueError` من مخزن الذاكرة                            |
+|    500 | `planner_error`            | `An internal planner error occurred.`           | `/plan`                              | أي `PlannerError` غير مصنَّف أعلاه                      |
+|    500 | `internal_error`           | `Internal server error.`                        | أي مسار HTTP                         | استثناء غير متوقع (الوسيطة `UnexpectedErrorMiddleware`) |
+|    502 | `planner_response_error`   | `Planner service returned an invalid response.` | `/plan`                              | `PlannerResponseError` — رد Ollama غير صالح             |
+|    503 | `planner_connection_error` | `Unable to connect to planner service.`         | `/plan`                              | `PlannerConnectionError` — تعذّر الوصول إلى Ollama      |
+|    503 | `planner_memory_error`     | `Planner memory backend is unavailable.`        | `/plan`                              | `PlannerMemoryError`                                    |
+|    503 | `memory_store_error`       | `Memory store is unavailable.`                  | `/memory`, `/memory/search`          | `MemoryStoreError`                                      |
 
 ### تفصيلان يسهل أخطاؤهما
 
@@ -91,23 +92,28 @@
 
 كل تجاوز لهذه الحدود يعيد `422` بغلاف `detail` (الجدول ب)، لا بغلاف `error`:
 
-| الحقل            | الحدّ                                   | المسارات         |
-| ---------------- | --------------------------------------- | ---------------- |
-| `goal`           | 1–2,000 حرف، ولا يُقبل نص من مسافات فقط | `/plan`          |
-| `screen_context` | ≤ 8,000 حرف (اختياري، افتراضيًا `""`)   | `/plan`          |
-| `content`        | 1–8,000 حرف                             | `/memory`        |
-| `query`          | 1–8,000 حرف                             | `/memory/search` |
-| `session_id`     | 1–256 حرف، ولا يُقبل نص من مسافات فقط   | الثلاثة          |
-| `limit`          | عدد صحيح 1–100 (افتراضيًا 3)            | `/memory/search` |
-| `metadata`       | كائن، افتراضيًا `{}`                    | `/memory`        |
+| الحقل            | الحدّ / السلوك                                                                        | المسارات         |
+| ---------------- | ------------------------------------------------------------------------------------- | ---------------- |
+| `goal`           | 1–2,000 حرف، ولا يُقبل نص من مسافات فقط                                               | `/plan`          |
+| `screen_context` | ≤ 8,000 حرف (اختياري، افتراضيًا `""`)                                                 | `/plan`          |
+| `content`        | 1–8,000 حرف                                                                           | `/memory`        |
+| `query`          | اختياري؛ إن أُرسل فهو 1–8,000 حرف وغير فارغ، وعند غيابه يَعرض البحث حسب النوع/الوسوم  | `/memory/search` |
+| `session_id`     | 1–256 حرف للمشروع؛ يُحذف عند global؛ مطلوب لـ`both`؛ `/plan` يتطلبه عند تفعيل الذاكرة | `/plan` والذاكرة |
+| `scope`          | `project` أو `global`؛ ويقبل البحث أيضًا `both`                                       | الذاكرة          |
+| `type`           | `note` أو `correction`; اختياري كفلتر بحث                                             | الذاكرة          |
+| `tags`           | قائمة حتى 20 وسمًا؛ كل وسم 1–64 حرفًا/رقمًا أو `.` أو `-` أو `_`                      | الذاكرة          |
+| `limit`          | عدد صحيح 1–100 (افتراضيًا 3)                                                          | `/memory/search` |
+| `metadata`       | كائن، افتراضيًا `{}`                                                                  | `/memory`        |
 
-النماذج صارمة: أي حقل إضافي غير معرَّف يعيد `422` بـ`extra_forbidden`. لا يوجد `/execute`، والخطة تحمل دائمًا `dry_run=true` و`execution_enabled=false`.
+النماذج صارمة: أي حقل إضافي غير معرَّف يعيد `422` بـ`extra_forbidden`. نتائج `/memory/search` تتضمن `scope`؛ يكون `session_id` فيها `null` لسجلات global. لا يوجد `/execute`، والخطة تحمل دائمًا `dry_run=true` و`execution_enabled=false`.
 
 ---
 
 ## ملاحظة أمان
 
-API **بلا مصادقة**، و`session_id` مُعرِّف اختيار لا تفويض. Compose ينشر المنفذ على loopback للمضيف فقط. لا تعرّض هذه الخدمة لشبكة غير موثوقة قبل إضافة مصادقة وتخويل. راجع `SECURITY.md` و`docs/threat-model-cela.md` (البند T11).
+المصادقة **اختيارية محليًا** وتُفعّل بضبط `CELA_API_KEY`؛ عند ضبطه تتطلب المسارات `/plan` و`/memory` و`/memory/search` رأس `Authorization: Bearer ...`. `/health` وواجهات التوثيق العامة لا تتطلب الرمز. ملف `docker-compose.cloud.yml` يرفض البدء دون قيمة للرمز، لكن يجب أيضًا أن يكون عشوائيًا بطول 32 محرفًا ASCII على الأقل. استخدم TLS عند ingress موثوق.
+
+الرمز المشترك يمنح جميع حامليه الصلاحيات نفسها، ولا يجعل `session_id` تفويضًا أو عزلًا بين المستخدمين. لذلك يقتصر هذا الإعداد على مشغّل موثوق واحد؛ لا توزّع المفتاح في JavaScript أو على مستخدمين غير موثوقين. Compose يربط المنفذ على loopback للمضيف فقط. راجع [دليل النشر السحابي](cloud-deployment.md) و`SECURITY.md` و`docs/threat-model-cela.md`.
 
 ---
 
@@ -140,7 +146,16 @@ curl -s http://127.0.0.1:8000/plan
 curl -s -X POST http://127.0.0.1:8000/memory \
   -H 'Content-Type: application/json' -d '{"session_id":"s","content":"نص"}'
 
-# النجاح — /health لا يستدعي أي نموذج
+# عند تفعيل CELA_API_KEY: 401 من دون رمز
+curl -i -X POST http://127.0.0.1:8000/plan \
+  -H 'Content-Type: application/json' -d '{"goal":"اقرأ صفحة عامة"}'
+
+# النجاح عند تفعيل المصادقة (استبدل <API_KEY> سرًا من مخزن الأسرار)
+curl -s -X POST http://127.0.0.1:8000/plan \
+  -H 'Authorization: Bearer <API_KEY>' \
+  -H 'Content-Type: application/json' -d '{"goal":"اقرأ صفحة عامة"}'
+
+# النجاح — /health لا يستدعي أي نموذج ولا يحتاج رمزًا
 curl -s http://127.0.0.1:8000/health
 ```
 

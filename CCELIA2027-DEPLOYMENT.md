@@ -4,10 +4,10 @@ This repository is one product with two deliberately separate runtime components
 
 ## System Map
 
-- `cela.sh` is the local Python planner. It uses Ollama, optionally retrieves session-isolated Qdrant memories, validates and classifies a plan, and always returns `dry_run=true` with `execution_enabled=false`.
+- `cela.sh` is the local-first Python planner. It uses Ollama, optionally retrieves session-isolated Qdrant memories, validates and classifies a plan, and always returns `dry_run=true` with `execution_enabled=false`. A separate single-operator cloud API deployment on a Linux VM is documented in [`docs/cloud-deployment.md`](docs/cloud-deployment.md); it is not automatically deployed by CI.
 - `ccelia2027/` is the Cloudflare Worker web app. It uses Workers AI and short-lived Browser Run sessions to read public HTTPS pages. It does not log in, click, type, submit forms, or mutate websites.
 - The components have separate plan schemas, providers, storage, and secrets. They do not call one another. Shared root CI, CodeQL, dependency updates, docs, and repository commands make them one maintained monorepo.
-- All workflows live in the repository-root `.github/workflows/`; the Worker package keeps none of its own. No push automatically deploys the Worker.
+- All workflows live in the repository-root `.github/workflows/`; the Worker package keeps none of its own. No push automatically deploys the Worker, and no Python VM credentials or deployment are configured in CI.
 
 See [System Architecture](docs/system-architecture.md) for data flows and trust boundaries.
 
@@ -24,7 +24,7 @@ bash ./cela.sh check-all
 
 ## Production Deployment Gate
 
-The only active production route is `.github/workflows/deploy-ccelia2027.yml`, manually dispatched from `main`. Before using it, the account owner must inspect Cloudflare directly and confirm all of the following:
+The only active GitHub Actions production route is `.github/workflows/deploy-ccelia2027.yml`, manually dispatched from `main`. Python cloud deployment is operator-managed on a Linux VM as described in [`docs/cloud-deployment.md`](docs/cloud-deployment.md); this repository does not provision a VM, hold its secrets, or deploy it from CI. Before using the Worker route, the account owner must inspect Cloudflare directly and confirm all of the following:
 
 - Workers Free is active.
 - No Workers Paid plan, billing profile, payment method, or automatic billing is enabled.

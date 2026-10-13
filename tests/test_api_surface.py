@@ -109,7 +109,17 @@ class DriftTests(unittest.TestCase):
         recorded_flags = {tuple(flag["options"]) for flag in recorded["cli_flags"]}
         current_flags = {tuple(flag["options"]) for flag in current["cli_flags"]}
         self.assertEqual(sorted(recorded_flags - current_flags), [], "a CLI flag was removed")
+        for command, flags in recorded.get("cli_subcommands", {}).items():
+            current_flags = {tuple(flag["options"]) for flag in current["cli_subcommands"].get(command, [])}
+            expected_flags = {tuple(flag["options"]) for flag in flags}
+            self.assertEqual(sorted(expected_flags - current_flags), [], f"a flag was removed from CLI {command}")
         self.assertEqual(recorded["exit_codes"], current["exit_codes"], "the exit-code table changed")
+
+    def test_the_explicit_learning_subcommand_is_recorded(self):
+        recorded = load_snapshot()["python"].get("cli_subcommands", {})
+        current = TOOL.build_surface()["python"].get("cli_subcommands", {})
+        self.assertTrue({"learn", "learn-file", "search"} <= current.keys())
+        self.assertTrue(recorded.keys() <= current.keys(), "a recorded CLI subcommand was removed")
 
     def test_no_worker_route_was_removed(self):
         recorded = {(route["method"], route["path"]) for route in load_snapshot()["worker"]["routes"]}
