@@ -60,6 +60,7 @@ class Settings:
     allow_ollama_container_host: bool = False
     planner_provider: str = "ollama"
     api_key: str | None = field(default=None, repr=False)
+    max_concurrent_requests: int = 40
 
     def __post_init__(self) -> None:
         if not isinstance(self.allow_ollama_container_host, bool):
@@ -95,6 +96,13 @@ class Settings:
         if isinstance(self.memory_limit, bool) or not isinstance(self.memory_limit, int) or self.memory_limit < 1:
             raise ConfigurationError("Memory limit must be a positive integer.")
         if (
+            isinstance(self.max_concurrent_requests, bool)
+            or not isinstance(self.max_concurrent_requests, int)
+            or self.max_concurrent_requests < 1
+            or self.max_concurrent_requests > 10_000
+        ):
+            raise ConfigurationError("Max concurrent requests must be an integer between 1 and 10000.")
+        if (
             isinstance(self.connect_timeout, bool)
             or not isinstance(self.connect_timeout, (int, float))
             or not math.isfinite(self.connect_timeout)
@@ -125,6 +133,7 @@ class Settings:
             qdrant_api_key=qdrant_api_key.strip() if qdrant_api_key and qdrant_api_key.strip() else None,
             connect_timeout=_positive_float("CELA_CONNECT_TIMEOUT", 3.05),
             read_timeout=_positive_float("CELA_READ_TIMEOUT", 60.0),
+            max_concurrent_requests=_positive_int("CELA_MAX_CONCURRENT_REQUESTS", 40),
             allow_ollama_container_host=_boolean("CELA_ALLOW_OLLAMA_CONTAINER_HOST"),
             planner_provider=os.environ.get("CELA_PLANNER_PROVIDER", "ollama").strip().lower(),
             api_key=api_key if api_key else None,

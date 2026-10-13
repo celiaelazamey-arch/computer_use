@@ -22,9 +22,10 @@ services:
       CELA_READ_TIMEOUT: "${CELA_READ_TIMEOUT:-60}"
     volumes:
       - cela_data:/app/data
-    depends_on:
-      ollama:
-        condition: service_healthy
+    # The API deliberately does NOT wait for Ollama. Planning is an optional
+    # dependency: while Ollama is down or still loading, /plan answers a typed
+    # 503 (and its circuit opens after repeated failures) while /health and
+    # the memory routes keep working. See docs/fault-tolerance-and-scaling.md.
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m

@@ -24,3 +24,11 @@ There is no R2, external model provider, user-supplied API key, or paid fallback
 - Sensitive wording requires explicit confirmation, but the executor remains read-only even after confirmation.
 - Internal daily limits stay under the documented Free ceiling: at most 5 Browser Run sessions (120,000 reserved ms each = a conservative 10-minute worst-case day), no more than 3 concurrent reservations, and a 20-second interval between starts; plus 28 AI calls (up to 9,800 estimated Neurons/day).
 - Deployment is manual only. Billing status is not automatically queried; verify Workers Free and no billing before dispatch.
+
+## Fault Isolation
+
+- Every dependency call is bounded in wall-clock time: budget-ledger stub fetches 5 s, login-limiter 5 s, planner AI 60 s, summary AI 90 s. Workers Free has no wall-clock limit per request, so without these a hung Durable Object or model call would hang a user request indefinitely. An abandoned AI call may still complete in the background and consume quota; the request no longer waits for it.
+- The ledger distinguishes "daily limit reached" (429) from "ledger unavailable" (503 with an honest message). No browser session starts and no model call is made without a confirmed reservation; a ledger error is never presented as an exhausted limit.
+- The Worker itself is request-stateless (signed session cookies and plan tokens), so it scales horizontally across Cloudflare's edge. The single global `DailyBudget` Durable Object remains the only shared state and serializes budget operations; at the free-tier volume (≤ 66 ledger calls/day) this is acceptable, and sharding across N objects is the documented path if the internal limits ever move.
+- `/health` and `/api/status` answer while the ledger is down: liveness is separate from dependency availability.
+- Fault and concurrency tests: `tests/worker.test.js`, suite "Ccelia fault isolation".

@@ -4,6 +4,18 @@ This project keeps **one current version** and no historical release line. `main
 
 The version string is identical in **eight** files, and `tests/test_version_consistency.py` fails the build when they drift: `pyproject.toml`, `ccelia2027/package.json` and its root `package-lock.json` metadata, `docs/architecture.md`, `docs/protocol.md`, `docs/api-errors.md`, `SECURITY.md` (supported-versions table), and `src/cela_sh/server.py` (the FastAPI `version=`, which is published to callers through `/openapi.json` and `/docs`). Bumping only package metadata leaves the public OpenAPI contract advertising a stale version.
 
+## Unreleased
+
+### Fault isolation and free-tier scaling
+
+- `cela.sh`: removed the process-wide request lock. Planner, embedding, and Qdrant HTTP clients now use per-thread pooled sessions behind one stable handle (`cela_sh.thread_sessions`); the SQLite store already used short-lived connections, so concurrent requests run in parallel with bounded thread-pool backpressure (`CELA_MAX_CONCURRENT_REQUESTS`, default 40).
+- `cela.sh`: per-dependency circuit breakers (`cela_sh.resilience.CircuitBreaker`) fail fast after 3 consecutive failures and re-probe automatically after a 10 s cooldown, exposing new stable 503 codes `planner_circuit_open` and `memory_circuit_open`. Input-validation errors do not trip a breaker, and the two dependencies have independent breakers.
+- `cela.sh`: new public `GET /readyz` — a passive dependency view (no I/O, no probing) built from real request outcomes: `unknown` means no evidence yet, never assumed healthy. `/health` now runs on the event loop and keeps answering even when the thread pool is fully blocked behind slow planner calls.
+- `cela.sh`: a memory write that is not confirmed, or that fails mid-transaction, is answered 503 and persists nothing (transaction rolls back text and vector together); verified by fault tests.
+- `ccelia2027`: bounded wall-clock deadlines on every dependency call — ledger stub fetches 5 s, login limiter 5 s, planner AI 60 s, summary AI 90 s — so a hung Durable Object or model call can no longer hang a user request. The ledger now distinguishes a confirmed daily limit (429) from an unavailable ledger (honest 503), and no browser or model work starts without a confirmed reservation.
+- Documentation: new `docs/fault-tolerance-and-scaling.md` records what survives each failure, the honest free-tier scaling limits (SQLite single-writer vs Qdrant shared store, one local Ollama, the single global budget Durable Object), and states explicitly that true HA (redundancy with automatic failover) for the local services is not available on the free tier.
+- No live deployment, no billing change, no external AI provider; `dry_run=true` and `execution_enabled=false` remain fixed, and no conversations or plans are stored automatically.
+
 ## 1.0.2
 
 ### Security

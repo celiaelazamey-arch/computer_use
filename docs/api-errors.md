@@ -4,7 +4,7 @@
 
 **الحالة:** مرجع وحيد. هذا الملف هو مصدر الحقيقة لعقد أخطاء API المحلية/السحابية؛ بقية الوثائق تشير إليه ولا تعيد سرد جداوله.
 
-**النطاق:** خدمة `cela-sh-api` في `src/cela_sh/server.py` (المسارات `/health` و`/plan` و`/memory` و`/memory/search`)، بما فيها المصادقة الاختيارية برمز Bearer. لا يشمل Worker في `ccelia2027/`، فهو تطبيق مستقل بسطح أخطاء خاص به.
+**النطاق:** خدمة `cela-sh-api` في `src/cela_sh/server.py` (المسارات `/health` و`/readyz` و`/plan` و`/memory` و`/memory/search`)، بما فيها المصادقة الاختيارية برمز Bearer. لا يشمل Worker في `ccelia2027/`، فهو تطبيق مستقل بسطح أخطاء خاص به.
 
 **طريقة التوثيق:** كل صف في الجدولين أدناه مُتحقَّق منه بتشغيل التطبيق فعليًا، لا بقراءة الكود فقط. أوامر إعادة التحقق في [ملحق التحقق](#ملحق-التحقق).
 
@@ -27,19 +27,50 @@
 
 ## الجدول أ — أخطاء التطبيق (غلاف `error`)
 
-| الحالة | `code`                     | `message` الثابتة                               | المسار                               | المحفّز                                                 |
-| -----: | -------------------------- | ----------------------------------------------- | ------------------------------------ | ------------------------------------------------------- |
-|    401 | `authentication_required`  | `A valid bearer token is required.`             | `/plan`, `/memory`, `/memory/search` | `CELA_API_KEY` مفعّل والرمز مفقود أو غير صحيح           |
-|    409 | `memory_disabled`          | `Memory is disabled in this deployment.`        | `/memory`, `/memory/search`          | الذاكرة غير مهيّئة في هذا النشر                         |
-|    422 | `planner_validation_error` | `Planner input validation failed.`              | `/plan`                              | `PlannerValidationError`                                |
-|    422 | `memory_validation_error`  | `Invalid memory input.`                         | `/memory`                            | `ValueError` من مخزن الذاكرة                            |
-|    422 | `memory_validation_error`  | `Invalid memory search input.`                  | `/memory/search`                     | `ValueError` من مخزن الذاكرة                            |
-|    500 | `planner_error`            | `An internal planner error occurred.`           | `/plan`                              | أي `PlannerError` غير مصنَّف أعلاه                      |
-|    500 | `internal_error`           | `Internal server error.`                        | أي مسار HTTP                         | استثناء غير متوقع (الوسيطة `UnexpectedErrorMiddleware`) |
-|    502 | `planner_response_error`   | `Planner service returned an invalid response.` | `/plan`                              | `PlannerResponseError` — رد Ollama غير صالح             |
-|    503 | `planner_connection_error` | `Unable to connect to planner service.`         | `/plan`                              | `PlannerConnectionError` — تعذّر الوصول إلى Ollama      |
-|    503 | `planner_memory_error`     | `Planner memory backend is unavailable.`        | `/plan`                              | `PlannerMemoryError`                                    |
-|    503 | `memory_store_error`       | `Memory store is unavailable.`                  | `/memory`, `/memory/search`          | `MemoryStoreError`                                      |
+| الحالة | `code`                     | `message` الثابتة                                                                     | المسار                               | المحفّز                                                                                 |
+| -----: | -------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------- |
+|    401 | `authentication_required`  | `A valid bearer token is required.`                                                   | `/plan`, `/memory`, `/memory/search` | `CELA_API_KEY` مفعّل والرمز مفقود أو غير صحيح                                           |
+|    409 | `memory_disabled`          | `Memory is disabled in this deployment.`                                              | `/memory`, `/memory/search`          | الذاكرة غير مهيّئة في هذا النشر                                                         |
+|    422 | `planner_validation_error` | `Planner input validation failed.`                                                    | `/plan`                              | `PlannerValidationError`                                                                |
+|    422 | `memory_validation_error`  | `Invalid memory input.`                                                               | `/memory`                            | `ValueError` من مخزن الذاكرة                                                            |
+|    422 | `memory_validation_error`  | `Invalid memory search input.`                                                        | `/memory/search`                     | `ValueError` من مخزن الذاكرة                                                            |
+|    500 | `planner_error`            | `An internal planner error occurred.`                                                 | `/plan`                              | أي `PlannerError` غير مصنَّف أعلاه                                                      |
+|    500 | `internal_error`           | `Internal server error.`                                                              | أي مسار HTTP                         | استثناء غير متوقع (الوسيطة `UnexpectedErrorMiddleware`)                                 |
+|    502 | `planner_response_error`   | `Planner service returned an invalid response.`                                       | `/plan`                              | `PlannerResponseError` — رد Ollama غير صالح                                             |
+|    503 | `planner_connection_error` | `Unable to connect to planner service.`                                               | `/plan`                              | `PlannerConnectionError` — تعذّر الوصول إلى Ollama                                      |
+|    503 | `planner_memory_error`     | `Planner memory backend is unavailable.`                                              | `/plan`                              | `PlannerMemoryError`                                                                    |
+|    503 | `planner_circuit_open`     | `The planner is temporarily unavailable after repeated failures. Retry shortly.`      | `/plan`                              | دائرة المخطط مفتوحة بعد 3 فشل متتالٍ ولم تمض مهلة 10 ثوانٍ؛ لا استدعاء HTTP على الإطلاق |
+|    503 | `memory_store_error`       | `Memory store is unavailable.`                                                        | `/memory`, `/memory/search`          | `MemoryStoreError`                                                                      |
+|    503 | `memory_circuit_open`      | `The memory store is temporarily unavailable after repeated failures. Retry shortly.` | `/memory`, `/memory/search`          | دائرة الذاكرة مفتوحة بعد 3 فشل متتالٍ ولم تمض مهلة 10 ثوانٍ                             |
+
+### الدوائر و`/readyz`
+
+الدوائر (`CircuitBreaker` في `src/cela_sh/resilience.py`) لكل اعتماد على حدة: `planner` و`memory` دائرتان مستقلتان، تفتحان بعد 3 فشل متتالٍ لمدة 10 ثوانٍ، ثم تسمحان بطلب استطلاع واحد يغلقها بالنجاح أو يعيد فتحها بالفشل — تعافٍ تلقائي. أخطاء تحقق الإدخال (`422`) لا تُحسب فشل اعتماد.
+
+`GET /readyz` عام بلا رمز، يجيب `200` دائمًا بغلاف نجاح (ليس خطأ):
+
+```json
+{
+  "status": "ok",
+  "live": true,
+  "dependencies": {
+    "planner": {
+      "state": "healthy|unavailable|unknown",
+      "consecutive_failures": 0,
+      "circuit": "closed|open|half_open"
+    },
+    "memory": {
+      "state": "healthy|unavailable|unknown|disabled",
+      "consecutive_failures": 0,
+      "circuit": "closed|open|half_open"
+    }
+  },
+  "dry_run": true,
+  "execution_enabled": false
+}
+```
+
+النظرة **سلبية**: الحالات تأتي من نتائج الطلبات الفعلية المسجّلة في مساراتها، لا من استكشاف؛ `unknown` تعني «لا دليل بعد» وليست صحة افتراضية، و`memory` تظهر `disabled` عند غياب المخزن. لا I/O على المسار نفسه، فهو لا يبطئ ولا يضيف حملًا، ولا يقدّم توفر وظيفة كحالة HTTP.
 
 ### تفصيلان يسهل أخطاؤهما
 
@@ -157,6 +188,9 @@ curl -s -X POST http://127.0.0.1:8000/plan \
 
 # النجاح — /health لا يستدعي أي نموذج ولا يحتاج رمزًا
 curl -s http://127.0.0.1:8000/health
+
+# /readyz — نظرة سلبية على حالة الاعتمادات (بلا رمز ولا I/O، 200 دائمًا)
+curl -s http://127.0.0.1:8000/readyz
 ```
 
 بقية صفوف الجدول أ تحتاج شرط العطل نفسه (إيقاف Ollama، أو إفساد مخزن الذاكرة، أو حقن استثناء)، وهي مُغطّاة آليًا:
@@ -166,7 +200,7 @@ bash ./cela.sh test              # المجموعة كلها offline: بلا ش�
 bash ./cela.sh api-surface --check
 ```
 
-الأسطر المُتحقَّق منها آليًا في `tests/test_server.py`: `UnexpectedErrorMiddlewareTests` (تعقيم الاستثناء على مستوى ASGI، وحدّا الردّ المبدوء والنطاق غير HTTP)، و`test_unexpected_errors_return_a_stable_json_500_without_details`، و`test_a_sanitized_500_still_answers_a_client_that_surfaces_exceptions`.
+الأسطر المُتحقَّق منها آليًا في `tests/test_server.py`: `UnexpectedErrorMiddlewareTests` (تعقيم الاستثناء على مستوى ASGI، وحدّا الردّ المبدوء والنطاق غير HTTP)، و`test_unexpected_errors_return_a_stable_json_500_without_details`، و`test_a_sanitized_500_still_answers_a_client_that_surfaces_exceptions`. وصفوف الدوائر (`planner_circuit_open` و`memory_circuit_open`) وسلوك `/readyz` تحت العطل مغطّاة في `tests/test_fault_isolation.py` و`tests/test_resilience.py`.
 
 ### إذا غيّر الكود هذا العقد
 

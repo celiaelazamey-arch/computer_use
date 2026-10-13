@@ -8,6 +8,7 @@ from typing import Any
 
 import requests
 
+from ..thread_sessions import ThreadLocalSession
 from .base import MemoryStore, MemoryStoreError
 from .embeddings import EmbeddingProvider, OllamaEmbeddingProvider
 from .metadata import metadata_matches, validate_memory_filters
@@ -50,7 +51,9 @@ class QdrantMemoryStore(MemoryStore):
         self._vector_size: int | None = None
         # Injected transport seam: tests can supply an offline double instead of
         # patching a private attribute. Any object exposing request()/headers works.
-        self._session = requests.Session() if session is None else session
+        # Production uses per-thread sessions (requests.Session is not thread-safe
+        # and this store is shared by every request thread).
+        self._session = ThreadLocalSession() if session is None else session
         self._session.trust_env = False
         if api_key is not None:
             self._session.headers.update({"api-key": api_key})

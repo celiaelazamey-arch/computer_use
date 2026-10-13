@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import requests
 
 from ..ollama_url import validate_ollama_url
+from ..thread_sessions import ThreadLocalSession
 from .base import MemoryStoreError
 
 
@@ -29,7 +30,8 @@ class OllamaEmbeddingProvider(EmbeddingProvider):
         self.model = model
         self.url = f"{base_url.rstrip('/')}/api/embed"
         self.timeout = timeout
-        self._session = requests.Session()
+        # Shared by concurrent request threads: per-thread sessions, one handle.
+        self._session = ThreadLocalSession()
         self._session.trust_env = False
 
     def embed(self, text: str) -> list[float]:

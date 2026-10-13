@@ -74,7 +74,7 @@ class ContainerConfigTests(unittest.TestCase):
                 with self.subTest(service=name, port=port):
                     self.assertTrue(port.startswith("127.0.0.1:"))
 
-    def test_api_has_persistent_storage_and_waits_for_healthy_ollama(self):
+    def test_api_has_persistent_storage_and_does_not_wait_for_ollama(self):
         api = self.compose["services"]["cela-sh-api"]
         self.assertEqual(api["profiles"], ["api"])
         self.assertEqual(api["build"]["target"], "runtime")
@@ -82,7 +82,10 @@ class ContainerConfigTests(unittest.TestCase):
         self.assertIn("cela_data", self.compose["volumes"])
         self.assertEqual(api["environment"]["CELA_MEMORY_BACKEND"], "sqlite-vec")
         self.assertEqual(api["environment"]["CELA_SQLITE_VEC_PATH"], "/app/data/cela_memory.db")
-        self.assertEqual(api["depends_on"]["ollama"]["condition"], "service_healthy")
+        # Planning is an optional dependency: the API must come up even when
+        # Ollama is down or still loading. /plan then answers a typed 503
+        # while liveness and memory keep working (no depends_on of any kind).
+        self.assertNotIn("depends_on", api)
         self.assertEqual(self.compose["services"]["ollama"]["healthcheck"]["test"], ["CMD", "ollama", "list"])
         self.assertNotIn(":latest", self.compose["services"]["ollama"]["image"])
 
