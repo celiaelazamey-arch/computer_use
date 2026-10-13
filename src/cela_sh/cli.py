@@ -60,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments[:1] in (["learn"], ["learn-file"], ["search"]):
+    if arguments[:1] in (["learn"], ["learn-file"], ["search"], ["brief"]):
         from .learning_cli import main as memory_main
 
         return memory_main(arguments)

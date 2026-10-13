@@ -184,6 +184,7 @@ def _python_surface() -> dict[str, Any]:
             "learn": _cli_flags(learning_cli.build_parser()),
             "learn-file": _cli_flags(learning_cli.build_file_parser()),
             "search": _cli_flags(learning_cli.build_search_parser()),
+            "brief": _cli_flags(learning_cli.build_brief_parser()),
         },
         "exit_codes": dict(sorted(cli.EXIT_CODES.items())),
         "memory_backends": list(registry.memory_backend_names()),

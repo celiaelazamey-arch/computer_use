@@ -57,6 +57,45 @@
       }
     ],
     "cli_subcommands": {
+      "brief": [
+        {
+          "default": "'==SUPPRESS=='",
+          "nargs": "0",
+          "options": [
+            "--help",
+            "-h"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--session-id"
+          ],
+          "required": true,
+          "type": "_session_id"
+        },
+        {
+          "default": "100",
+          "nargs": null,
+          "options": [
+            "--limit"
+          ],
+          "required": false,
+          "type": "_limit"
+        },
+        {
+          "default": "False",
+          "nargs": "0",
+          "options": [
+            "--text"
+          ],
+          "required": false,
+          "type": null
+        }
+      ],
       "learn": [
         {
           "default": "'==SUPPRESS=='",
@@ -74,8 +113,17 @@
           "options": [
             "--content"
           ],
-          "required": true,
+          "required": false,
           "type": "_content"
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--from-plan"
+          ],
+          "required": false,
+          "type": "_plan_path"
         },
         {
           "default": "'project'",
@@ -96,7 +144,7 @@
           "type": "_session_id"
         },
         {
-          "default": "'note'",
+          "default": "'==SUPPRESS=='",
           "nargs": null,
           "options": [
             "--type"
@@ -112,6 +160,51 @@
           ],
           "required": false,
           "type": "_tag"
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--reason"
+          ],
+          "required": false,
+          "type": "_validate_content"
+        },
+        {
+          "default": "[]",
+          "nargs": null,
+          "options": [
+            "--rejected"
+          ],
+          "required": false,
+          "type": "_validate_content"
+        },
+        {
+          "default": "'active'",
+          "nargs": null,
+          "options": [
+            "--status"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--superseded-by"
+          ],
+          "required": false,
+          "type": "_validate_content"
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--why"
+          ],
+          "required": false,
+          "type": "_validate_content"
         }
       ],
       "learn-file": [
@@ -151,7 +244,7 @@
           "type": "_session_id"
         },
         {
-          "default": "'note'",
+          "default": "'==SUPPRESS=='",
           "nargs": null,
           "options": [
             "--type"
