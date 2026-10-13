@@ -5,7 +5,16 @@ Set ``CELA_API_KEY`` to require a bearer token on planning and memory routes;
 cloud deployments must set it and terminate TLS at a trusted ingress. Session
 IDs remain selectors, not credentials or per-user authorization.
 
-Plans remain dry-run and never write memory. ``/health`` is public liveness only.
+Plans remain dry-run and never write memory. ``/health`` is public liveness only;
+``/readyz`` is a passive per-dependency view (no I/O, no probing) that keeps
+"the service is alive" separate from "this optional dependency is working".
+
+Fault isolation: there is no process-wide request lock. Planner, embedding,
+and Qdrant HTTP clients use per-thread sessions, the SQLite store uses
+short-lived connections, and each dependency is guarded by a circuit breaker
+that fails fast after repeated failures and re-probes once the dependency can
+recover. A dead or slow optional dependency therefore degrades its own routes
+with a typed 503 instead of stalling or dropping the rest of the API.
 
 Every failure is answered with a stable code and a fixed sentence. Unexpected
 exceptions become a sanitized ``500`` and are logged server-side; exception text,
@@ -16,9 +25,9 @@ import hmac
 import logging
 import math
 from contextlib import asynccontextmanager
-from threading import Lock
 from typing import Any, Literal
 
+import anyio
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -38,6 +47,7 @@ from .planner.client import (
     PlannerValidationError,
 )
 from .planner.models import Plan, PlannerInput, StrictModel
+from .resilience import CircuitBreaker, DependencyHealth
 from .settings import Settings
 
 _logger = logging.getLogger(__name__)
@@ -196,9 +206,21 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         config = settings or Settings.from_env()
         application.state.settings = config
         application.state.planner = planner if planner is not None else create_planner(config)
-        # requests.Session is mutable and not guaranteed thread-safe. Keep the
-        # shared planner/embedding sessions out of concurrent worker threads.
-        application.state.backend_lock = Lock()
+        # No process-wide lock: the planner/embedding/Qdrant HTTP clients use
+        # per-thread sessions and the SQLite store uses short-lived
+        # connections, so concurrent requests are safe without serializing
+        # the whole API behind one dependency.
+        # Each dependency gets its own breaker (bulkhead): a failing planner
+        # cannot trip the memory breaker and vice versa.
+        application.state.planner_breaker = CircuitBreaker("planner")
+        application.state.memory_breaker = CircuitBreaker("memory")
+        application.state.dependency_health = DependencyHealth()
+        # Backpressure: cap the thread pool that synchronous handlers run in.
+        # Slow Ollama calls then queue here instead of spawning unbounded
+        # work, and liveness routes (async) never wait on this pool.
+        anyio.to_thread.current_default_thread_limiter().total_tokens = (
+            config.max_concurrent_requests
+        )
         try:
             yield
         finally:
@@ -258,12 +280,48 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         return _error(503, "memory_store_error", "Memory store is unavailable.")
 
     @application.get("/health", tags=["health"])
-    def health():
-        # Liveness only: no Ollama calls or implicit model downloads. Starting
-        # the app has already validated settings and initialized its store.
+    async def health():
+        # Liveness only: no Ollama calls or implicit model downloads, and no
+        # dependency access at all. Starting the app has already validated
+        # settings and initialized its store. Async on purpose: liveness must
+        # keep answering on the event loop even when every thread-pool token
+        # is blocked behind a slow planner call.
         return {
             "status": "ok",
             "memory_backend": application.state.settings.memory_backend,
+            "dry_run": True,
+            "execution_enabled": False,
+        }
+
+    @application.get("/readyz", tags=["health"])
+    async def readyz():
+        # Dependency readiness, passive: the states come from real request
+        # outcomes recorded by the routes below (never assumed healthy, never
+        # probed here), so a broken optional dependency shows up without
+        # adding load or ever claiming availability without evidence. Always
+        # 200: the service is live; which *functions* are degraded is data,
+        # not the HTTP status.
+        health_view = application.state.dependency_health
+        dependencies: dict[str, dict[str, Any]] = {
+            "planner": {
+                "state": health_view.state("planner"),
+                "consecutive_failures": health_view.consecutive_failures("planner"),
+                "circuit": application.state.planner_breaker.state,
+            }
+        }
+        store = application.state.planner.memory_store
+        if store is None:
+            dependencies["memory"] = {"state": "disabled"}
+        else:
+            dependencies["memory"] = {
+                "state": health_view.state("memory"),
+                "consecutive_failures": health_view.consecutive_failures("memory"),
+                "circuit": application.state.memory_breaker.state,
+            }
+        return {
+            "status": "ok",
+            "live": True,
+            "dependencies": dependencies,
             "dry_run": True,
             "execution_enabled": False,
         }
@@ -275,10 +333,44 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         dependencies=[Depends(_require_api_key)],
     )
     def plan(body: PlanRequest):
-        with application.state.backend_lock:
-            return application.state.planner.generate_plan(
+        state = application.state
+        if not state.planner_breaker.allow():
+            # Fail fast: the planner has been failing repeatedly and the
+            # cooldown has not elapsed. No fake plan, no stacked timeouts.
+            return _error(
+                503,
+                "planner_circuit_open",
+                "The planner is temporarily unavailable after repeated failures. Retry shortly.",
+            )
+        if state.planner.memory_store is not None and not state.memory_breaker.allow():
+            # Planning with memory enabled depends on the memory store; if its
+            # breaker is open, fail fast with the honest typed error instead of
+            # waiting for the store timeout on every request.
+            return _error(503, "planner_memory_error", "Planner memory backend is unavailable.")
+        try:
+            result = state.planner.generate_plan(
                 body.goal, body.screen_context, session_id=body.session_id
             )
+        except PlannerError as exc:
+            if isinstance(exc, (PlannerConnectionError, PlannerResponseError)):
+                state.planner_breaker.record_failure()
+                state.dependency_health.record_failure("planner")
+            elif isinstance(exc, PlannerMemoryError):
+                # The memory lookup inside planning failed: attribute it to the
+                # memory dependency, not to Ollama.
+                state.memory_breaker.record_failure()
+                state.dependency_health.record_failure("memory")
+            # PlannerValidationError is an input problem, not a dependency
+            # failure: it must not trip the breaker.
+            raise
+        state.planner_breaker.record_success()
+        state.dependency_health.record_success("planner")
+        if state.planner.memory_store is not None:
+            # A successful plan with memory enabled proves the in-plan memory
+            # lookup worked too (and closes a half-open memory circuit).
+            state.dependency_health.record_success("memory")
+            state.memory_breaker.record_success()
+        return result
 
     def memory_store() -> MemoryStore | None:
         return application.state.planner.memory_store
@@ -290,9 +382,16 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         dependencies=[Depends(_require_api_key)],
     )
     def add_memory(body: MemoryRequest):
+        state = application.state
         store = memory_store()
         if store is None:
             return _error(409, "memory_disabled", "Memory is disabled in this deployment.")
+        if not state.memory_breaker.allow():
+            return _error(
+                503,
+                "memory_circuit_open",
+                "The memory store is temporarily unavailable after repeated failures. Retry shortly.",
+            )
         try:
             session = memory_session_id(body.scope, body.session_id)
             metadata = {
@@ -305,12 +404,20 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
                     "tags": normalize_tags(body.tags),
                 }
             )
-            with application.state.backend_lock:
-                stored = store.add_memory(session, body.content, metadata)
+            stored = store.add_memory(session, body.content, metadata)
         except ValueError:
             return _error(422, "memory_validation_error", "Invalid memory input.")
+        except MemoryStoreError:
+            state.memory_breaker.record_failure()
+            state.dependency_health.record_failure("memory")
+            raise
         if stored is not True:
+            # A write that is not confirmed is a failed write, never a success.
+            state.memory_breaker.record_failure()
+            state.dependency_health.record_failure("memory")
             raise MemoryStoreError("Memory store did not confirm the write.")
+        state.memory_breaker.record_success()
+        state.dependency_health.record_success("memory")
         return {"stored": True}
 
     @application.post(
@@ -320,59 +427,71 @@ def create_app(settings: Settings | None = None, planner: Planner | None = None)
         dependencies=[Depends(_require_api_key)],
     )
     def search_memory(body: MemorySearchRequest):
+        state = application.state
         store = memory_store()
         if store is None:
             return _error(409, "memory_disabled", "Memory is disabled in this deployment.")
+        if not state.memory_breaker.allow():
+            return _error(
+                503,
+                "memory_circuit_open",
+                "The memory store is temporarily unavailable after repeated failures. Retry shortly.",
+            )
         try:
             scopes = search_session_ids(body.scope, body.session_id)
             tags = normalize_tags(body.tags)
             results = []
-            with application.state.backend_lock:
-                for scope, session in scopes:
-                    if body.query is None:
-                        memories = store.list_memory(
-                            session,
-                            limit=body.limit,
-                            tags=tags,
-                            memory_type=body.type,
-                        )
-                    else:
-                        candidate_limit = min(max(body.limit * 5, body.limit), 1_000)
-                        memories = store.search_memory(body.query, session, limit=candidate_limit)
-                        memories = [
-                            memory
-                            for memory in memories
-                            if isinstance(memory, dict)
-                            and metadata_matches(memory.get("metadata"), tags=tags, memory_type=body.type)
-                        ]
-                    for memory in memories:
-                        if not isinstance(memory, dict) or memory.get("session_id") != session:
-                            raise MemoryStoreError("Memory store returned invalid results.")
-                        metadata = memory.get("metadata")
-                        content = memory.get("content")
-                        score = memory.get("score")
-                        if (
-                            not isinstance(metadata, dict)
-                            or not isinstance(content, str)
-                            or not content.strip()
-                            or len(content) > 8_000
-                            or isinstance(score, bool)
-                            or not isinstance(score, (int, float))
-                            or not math.isfinite(score)
-                        ):
-                            raise MemoryStoreError("Memory store returned invalid results.")
-                        results.append(
-                            {
-                                "session_id": body.session_id.strip() if scope == "project" else None,
-                                "scope": scope,
-                                "content": content,
-                                "metadata": metadata,
-                                "score": float(score),
-                            }
-                        )
+            for scope, session in scopes:
+                if body.query is None:
+                    memories = store.list_memory(
+                        session,
+                        limit=body.limit,
+                        tags=tags,
+                        memory_type=body.type,
+                    )
+                else:
+                    candidate_limit = min(max(body.limit * 5, body.limit), 1_000)
+                    memories = store.search_memory(body.query, session, limit=candidate_limit)
+                    memories = [
+                        memory
+                        for memory in memories
+                        if isinstance(memory, dict)
+                        and metadata_matches(memory.get("metadata"), tags=tags, memory_type=body.type)
+                    ]
+                for memory in memories:
+                    if not isinstance(memory, dict) or memory.get("session_id") != session:
+                        raise MemoryStoreError("Memory store returned invalid results.")
+                    metadata = memory.get("metadata")
+                    content = memory.get("content")
+                    score = memory.get("score")
+                    if (
+                        not isinstance(metadata, dict)
+                        or not isinstance(content, str)
+                        or not content.strip()
+                        or len(content) > 8_000
+                        or isinstance(score, bool)
+                        or not isinstance(score, (int, float))
+                        or not math.isfinite(score)
+                    ):
+                        raise MemoryStoreError("Memory store returned invalid results.")
+                    results.append(
+                        {
+                            "session_id": body.session_id.strip() if scope == "project" else None,
+                            "scope": scope,
+                            "content": content,
+                            "metadata": metadata,
+                            "score": float(score),
+                        }
+                    )
+            state.memory_breaker.record_success()
+            state.dependency_health.record_success("memory")
             return correction_first(results)[: body.limit]
         except ValueError:
             return _error(422, "memory_validation_error", "Invalid memory search input.")
+        except MemoryStoreError:
+            state.memory_breaker.record_failure()
+            state.dependency_health.record_failure("memory")
+            raise
 
     return application
 

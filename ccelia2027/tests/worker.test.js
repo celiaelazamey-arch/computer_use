@@ -52,6 +52,8 @@ function createEnvironment({
   browserError,
   budgetAllowed = true,
   budgetFailsOn,
+  budgetFetch,
+  aiHang,
   password = "local-test-password",
 } = {}) {
   const state = createState();
@@ -69,9 +71,11 @@ function createEnvironment({
     AI: {
       async run(_model, input) {
         calls.ai += 1;
-        if (aiError) throw aiError;
         const isPlanner =
           input.messages[0].content.includes("planning component");
+        if (aiHang === true || aiHang === (isPlanner ? "plan" : "summary"))
+          return new Promise(() => {});
+        if (aiError) throw aiError;
         if (isPlanner) calls.plannerInput = input.messages[1].content;
         else {
           calls.summaryInput = input.messages[1].content;
@@ -175,6 +179,10 @@ function createEnvironment({
       idFromName: () => "global",
       get: () => ({
         fetch: async (input, init) => {
+          if (budgetFetch) {
+            const overridden = budgetFetch(input, init);
+            if (overridden !== undefined) return overridden;
+          }
           if (
             budgetFailsOn &&
             new URL(String(input)).pathname === budgetFailsOn
@@ -260,6 +268,10 @@ async function withDnsAnswers(
     globalThis.fetch = originalFetch;
   }
 }
+
+const planTask = "افتح https://example.com واقرأ الصفحة";
+const onPublicDns = (fn) =>
+  withDnsAnswers(["93.184.216.34"], fn, ["2606:4700:4700::1111"]);
 
 describe("Ccelia read-only agent Worker", () => {
   it("keeps health independent of private credentials", async () => {
@@ -907,9 +919,6 @@ describe("Ccelia read-only agent Worker", () => {
     const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
     return JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
   };
-  const planTask = "افتح https://example.com واقرأ الصفحة";
-  const onPublicDns = (fn) =>
-    withDnsAnswers(["93.184.216.34"], fn, ["2606:4700:4700::1111"]);
 
   it("issues every plan token with its own random jti", async () => {
     const { env } = createEnvironment();
@@ -1063,5 +1072,215 @@ describe("Ccelia read-only agent Worker", () => {
     );
     assert.equal(state.values.has(`plan:${old}`), false);
     assert.equal(state.values.has(`plan:${fresh}`), true);
+  });
+});
+
+describe("Ccelia fault isolation", () => {
+  // Short injected deadlines: a hung dependency is proven bounded in
+  // milliseconds, not real seconds.
+  const fastWorker = createWorker((binding) => binding.launch(), {
+    budgetTimeoutMs: 50,
+    loginLimiterTimeoutMs: 50,
+    aiPlanDeadlineMs: 50,
+    aiSummaryDeadlineMs: 50,
+  });
+
+  // Mirrors a Durable Object that never answers: it settles only through the
+  // abort signal the Worker must attach to the stub fetch.
+  const hungFetch = (_input, init) =>
+    new Promise((_, reject) => {
+      init?.signal?.addEventListener(
+        "abort",
+        () => reject(new Error("abort")),
+        { once: true },
+      );
+    });
+
+  // In Node, a request that awaits only an unref'd AbortSignal.timeout can
+  // drain the test event loop before the abort fires; the Workers runtime
+  // keeps an invocation alive for its pending request. A ref'd keep-alive
+  // mirrors that and is always cleared, so the suite stays deterministic.
+  async function fetchKeptAlive(promise) {
+    let keepAliveTimer;
+    const keepAlive = new Promise((resolve) => {
+      keepAliveTimer = setTimeout(resolve, 1_000);
+    });
+    try {
+      const winner = await Promise.race([
+        promise.then((response) => ({ response })),
+        keepAlive.then(() => ({ keepAlive: true })),
+      ]);
+      if (winner.keepAlive) return await promise;
+      return winner.response;
+    } finally {
+      clearTimeout(keepAliveTimer);
+    }
+  }
+
+  it("answers a ledger error with an honest 503, not a 429 limit", async () => {
+    const { env, calls } = createEnvironment({
+      budgetFetch: () => new Response("boom", { status: 500 }),
+    });
+    const cookie = await login(env);
+
+    const planResponse = await fastWorker.fetch(
+      post("/api/plan", { task: planTask }, cookie),
+      env,
+    );
+    assert.equal(planResponse.status, 503);
+    const planBody = await planResponse.json();
+    assert.match(planBody.error, /تعذر التحقق من الميزانية/);
+    assert.doesNotMatch(planBody.error, /حد الاستخدام/);
+    assert.equal(calls.ai, 0);
+  });
+
+  it("fails closed before any browser when the ledger answers an error", async () => {
+    // The plan itself needs a healthy ledger; only the later browser
+    // reservation fails, which is the case that must not start a browser.
+    const { env, calls } = createEnvironment({
+      budgetFetch: (input, init) => {
+        if (new URL(String(input)).pathname !== "/reserve") return undefined;
+        const body = JSON.parse(init?.body ?? "{}");
+        return body.kind === "browser"
+          ? new Response("boom", { status: 500 })
+          : undefined;
+      },
+    });
+    const cookie = await login(env);
+
+    const planResponse = await worker.fetch(
+      post("/api/plan", { task: planTask }, cookie),
+      env,
+    );
+    assert.equal(planResponse.status, 200);
+    const { planToken } = await planResponse.json();
+
+    const response = await onPublicDns(() =>
+      fastWorker.fetch(post("/api/execute", { planToken }, cookie), env),
+    );
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.match(body.error, /تعذر حجز جلسة المتصفح/);
+    assert.equal(calls.browser, 0);
+  });
+
+  it("bounds a hung ledger and fails closed on the plan path", async () => {
+    const { env, calls } = createEnvironment({
+      budgetFetch: hungFetch,
+    });
+    const cookie = await login(env);
+    const started = Date.now();
+    const response = await fetchKeptAlive(
+      fastWorker.fetch(post("/api/plan", { task: planTask }, cookie), env),
+    );
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /تعذر التحقق من الميزانية/);
+    assert.equal(calls.ai, 0);
+    assert.ok(
+      Date.now() - started < 2_000,
+      "the hung ledger must not hang the request",
+    );
+  });
+
+  it("bounds a hung ledger on plan consumption without starting a browser", async () => {
+    const { env, calls } = createEnvironment();
+    const cookie = await login(env);
+    const { planToken } = await (
+      await worker.fetch(post("/api/plan", { task: planTask }, cookie), env)
+    ).json();
+
+    const hangingWorker = createWorker((binding) => binding.launch(), {
+      budgetTimeoutMs: 50,
+    });
+    const { env: brokenEnv } = createEnvironment({ budgetFetch: hungFetch });
+    const started = Date.now();
+    const response = await onPublicDns(() =>
+      fetchKeptAlive(
+        hangingWorker.fetch(
+          post("/api/execute", { planToken }, cookie),
+          brokenEnv,
+        ),
+      ),
+    );
+    assert.equal(response.status, 503);
+    assert.equal(calls.browser, 0);
+    assert.ok(
+      Date.now() - started < 2_000,
+      "a hung consume must not hang the request",
+    );
+  });
+
+  it("bounds a hung planner model call and answers 503 without a plan", async () => {
+    const { env, calls } = createEnvironment({ aiHang: "plan" });
+    const cookie = await login(env);
+    const started = Date.now();
+    const response = await fastWorker.fetch(
+      post("/api/plan", { task: planTask }, cookie),
+      env,
+    );
+    assert.equal(response.status, 503);
+    assert.doesNotMatch(JSON.stringify(await response.json()), /"plan"/);
+    assert.equal(calls.ai, 1);
+    assert.ok(
+      Date.now() - started < 2_000,
+      "the hung model call must not hang the request",
+    );
+  });
+
+  it("bounds a hung summary model call, keeps the evidence, and closes the browser", async () => {
+    const { env, calls } = createEnvironment({ aiHang: "summary" });
+    const cookie = await login(env);
+    const { planToken } = await (
+      await worker.fetch(post("/api/plan", { task: planTask }, cookie), env)
+    ).json();
+
+    const started = Date.now();
+    const response = await onPublicDns(() =>
+      fastWorker.fetch(post("/api/execute", { planToken }, cookie), env),
+    );
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.match(body.error, /تعذر تلخيص الصفحة بالنموذج/);
+    assert.ok(body.evidence?.url === "https://example.com/");
+    assert.equal(calls.browser, 1);
+    assert.equal(calls.browserClosed, 1);
+    assert.ok(
+      Date.now() - started < 2_000,
+      "the hung summary must not hang the request",
+    );
+  });
+
+  it("serves concurrent requests without shared request state", async () => {
+    const { env } = createEnvironment();
+    const cookie = await login(env);
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        worker.fetch(post("/api/plan", { task: planTask }, cookie), env),
+      ),
+    );
+    for (const response of results) {
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      assert.ok(body.plan);
+      assert.ok(body.planToken);
+    }
+  });
+
+  it("keeps liveness and status serving while the ledger is down", async () => {
+    const { env } = createEnvironment({
+      budgetFetch: () => new Response("boom", { status: 500 }),
+    });
+
+    const health = await fastWorker.fetch(
+      new Request("https://agent.test/health"),
+      env,
+    );
+    assert.equal(health.status, 200);
+    const status = await fastWorker.fetch(
+      new Request("https://agent.test/api/status"),
+      env,
+    );
+    assert.equal(status.status, 200);
+    assert.equal((await status.json()).configured, true);
   });
 });

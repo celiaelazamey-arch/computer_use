@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from ..memory import MemoryStore
 from ..ollama_url import validate_ollama_url
+from ..thread_sessions import ThreadLocalSession
 from .base import Planner
 from .models import Plan, RawPlan
 from .policy import apply_policy
@@ -72,7 +73,10 @@ class OllamaPlanner(Planner):
         self.memory_store = memory_store
         self.memory_limit = memory_limit
         self.url = f"{base_url.rstrip('/')}/api/generate"
-        self._session = requests.Session()
+        # requests.Session is not thread-safe and this planner is shared by
+        # every request thread; a per-thread session pool keeps concurrent
+        # planning safe without a process-wide lock.
+        self._session = ThreadLocalSession()
         self._session.trust_env = False
 
     def generate_plan(self, goal: str, screen_context: str = "", session_id: str | None = None) -> Plan:
