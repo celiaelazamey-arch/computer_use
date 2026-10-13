@@ -134,7 +134,7 @@ curl --fail http://127.0.0.1:8000/health
 - `src/cela_sh/memory/`: عقد الذاكرة، مخزن اختباري مؤقت، embeddings، محول Qdrant REST، ومخزن `vec0` الحقيقي، و`registry.py` لتسجيل مخازن جديدة.
 - `tests/`: اختبارات offline، وعقود سلوكية مشتركة في `contract_memory_store.py` و`contract_planner.py`، وبدائل غير متصلة في `fakes.py`؛ `integration_plan_probe.py` لفحص توليد الخطة الحي و`integration_live_probe.py` لفحص الذاكرة الحي الاختياري.
 - `tools/api_surface.py`: يلتقط سطح العقد العام للمستودع في `tests/snapshots/api_surface.json` لكشف أي كسر توافق.
-- `docs/`: المعمارية والبروتوكول ودليل التوسعة وقائمة تسليم التشغيل، و[عقد أخطاء API](docs/api-errors.md) كمرجع وحيد لأشكال الاستجابة ورموزها.
+- `docs/`: المعمارية والبروتوكول ودليل التوسعة وقائمة تسليم التشغيل، و[عقد أخطاء API](docs/api-errors.md) كمرجع وحيد لأشكال الاستجابة ورموزها، و[مستويات تحليل المشاريع البرمجية](docs/software-project-analysis-levels.md) كمرجع منهجي عام بالعربية (ثمانية مستويات من الأعمال إلى الصيانة) لا يصف سلوك أي مكوّن في هذا المستودع.
 - `ccelia2027/`: تطبيق Worker مستقل داخل المستودع؛ استخدم [دليل تشغيله](ccelia2027/README.md) و[دليل النشر الموحد](CCELIA2027-DEPLOYMENT.md).
 - `.github/workflows/`: CI لكلا التطبيقين، CodeQL لـ JavaScript وPython، ونشر Worker يدوي فقط.
 - `.github/`: حوكمة المستودع كلها في الجذر — `CODEOWNERS` وقوالب Issues وPull Request. لا يحتفظ `ccelia2027/` بأي ملفات workflows أو حوكمة خاصة به.
