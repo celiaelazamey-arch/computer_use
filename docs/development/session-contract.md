@@ -53,20 +53,26 @@ test "$(git rev-parse HEAD^{tree})" = \
 أرقام `compare` (`ahead_by`/`behind_by`) لا تصلح حكمًا هنا: إنها تعدّ انحراف التاريخ، لا فقدان المحتوى. عند الدمج بـ commit دمج حقيقي (`parents=2`) يبقى رأس الفرع وصولًا من `main` فيصبح عدّه الإضافي صفرًا؛ أما عند الدمج بـ squash (`parents=1`) فإن رأس الـPR يفقد وصوليته دائمًا، فيتأخّر الفرع بعدد كوميتاته مهما كان محتواه مُدمَجًا بالكامل. لذلك يُقرأ عدد الوالدين أولًا، ثم يُقارَن المحتوى نفسه: شجرة رأس الفرع مقابل شجرة كوميت الدمج في `main`؛ التطابق الشجري هو الدليل، والتباين في العدّ ليس.
 
 ```bash
-git fetch origin main
-head="$(git rev-parse origin/"$branch")"
-main="$(git rev-parse origin/main)"
+# اقرأ SHA من ls-remote، لا من مراجع التتبع المحلي: الفروع البعيدة قد لا
+# تُجلب تلقائيًا (refspec) أو تكون الكائنات فيها مقلّصة (shallow clone).
+head="$(git ls-remote origin "refs/heads/$branch" | cut -f1)"
+main="$(git ls-remote origin refs/heads/main | cut -f1)"
+git fetch origin "$head" "$main"
 if git merge-base --is-ancestor "$head" "$main"; then
   echo "contained: the branch head is reachable from main"
-elif test "$(git rev-parse "$head^{tree}")" = \
-          "$(git rev-parse "$(gh pr view "$pr" --json mergeCommit --jq .mergeCommit.oid)"^{tree})"; then
-  echo "squash-merged: content merged, branch head not reachable"
 else
-  echo "not merged: record the delta as an open item"
+  # احمِ القيمة من null: الـPR المفتوح لا يملك كوميت دمج.
+  mc="$(gh pr view "$pr" --json mergeCommit --jq '.mergeCommit.oid // ""')"
+  if [ -n "$mc" ] && test "$(git rev-parse "$head^{tree}")" = \
+                       "$(git rev-parse "$mc^{tree}")"; then
+    echo "squash-merged: content merged, branch head not reachable"
+  else
+    echo "not merged: record the delta as an open item"
+  fi
 fi
 ```
 
-- **الفرع لا يضيف شيئًا** (أحد الفرعين الأولين): يُحذف صراحةً، ويُرقَّم رأسه في السجل قبل الحذف؛ الاسترجاع ممكن من صفحة الـPR المدموج (`Restore branch`) أو بدفع ذلك الـSHA.
+- **الفرع لا يضيف شيئًا** (`contained` أو `squash-merged`): يُحذف صراحةً، ويُرقَّم رأسه في السجل قبل الحذف؛ الاسترجاع ممكن من صفحة الـPR المدموج (`Restore branch`) أو بدفع ذلك الـSHA.
 - **الفرع يضيف شيئًا**: يبقى، ويُسجَّل ما يضيفه بندًا معلّقًا. لا يُترك صامتًا: فرع معلّق بلا قرار ضجيج، وفرع معلّق بسبب عمل غير مدموج إشارة.
 - **فرع بلا PR** لا يثبت إلا وجود عمل؛ قراره (حذف، أرشفة، أو فتح PR) يبقى قرارًا بشريًا.
 
