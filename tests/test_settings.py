@@ -16,6 +16,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.planner_model, "qwen2.5:3b")
         self.assertEqual(settings.memory_backend, "disabled")
         self.assertIsNone(settings.qdrant_api_key)
+        self.assertIsNone(settings.api_key)
 
     def test_factory_does_not_connect_or_create_memory_when_disabled(self):
         settings = Settings()
@@ -40,6 +41,7 @@ class SettingsTests(unittest.TestCase):
             "CELA_QDRANT_URL": "https://memory.example:6333",
             "CELA_QDRANT_COLLECTION": "sessions",
             "CELA_QDRANT_API_KEY": "local-secret",
+            "CELA_API_KEY": "0123456789abcdef" * 4,
             "CELA_CONNECT_TIMEOUT": "2.5",
             "CELA_READ_TIMEOUT": "45",
         }
@@ -49,6 +51,9 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.memory_backend, "qdrant")
         self.assertEqual(settings.memory_limit, 5)
         self.assertEqual(settings.qdrant_api_key, "local-secret")
+        self.assertEqual(settings.api_key, "0123456789abcdef" * 4)
+        self.assertNotIn("local-secret", repr(settings))
+        self.assertNotIn(settings.api_key, repr(settings))
         self.assertEqual(settings.connect_timeout, 2.5)
         self.assertEqual(settings.read_timeout, 45)
 
@@ -60,6 +65,9 @@ class SettingsTests(unittest.TestCase):
             {"CELA_READ_TIMEOUT": "inf"},
             {"CELA_MEMORY_LIMIT": "-1"},
             {"CELA_OLLAMA_URL": "   "},
+            {"CELA_API_KEY": "too-short"},
+            {"CELA_API_KEY": "0123456789abcdef0123456789abcde "},
+            {"CELA_API_KEY": "0123456789abcdef0123456789abcdeé"},
             {"CELA_MEMORY_BACKEND": "qdrant", "CELA_QDRANT_COLLECTION": " "},
         ):
             with self.subTest(env=env), patch.dict(os.environ, env, clear=True):

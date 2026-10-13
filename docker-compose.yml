@@ -12,6 +12,7 @@ services:
     environment:
       CELA_OLLAMA_URL: http://ollama:11434
       CELA_ALLOW_OLLAMA_CONTAINER_HOST: "true"
+      CELA_API_KEY: "${CELA_API_KEY:-}"
       CELA_PLANNER_MODEL: "${CELA_PLANNER_MODEL:-qwen2.5:3b}"
       CELA_EMBEDDING_MODEL: "${CELA_EMBEDDING_MODEL:-nomic-embed-text}"
       CELA_MEMORY_BACKEND: sqlite-vec

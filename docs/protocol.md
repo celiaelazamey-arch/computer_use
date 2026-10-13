@@ -1,8 +1,8 @@
 # بروتوكول cela.sh
 
-**الإصدار:** 1.0.1
+**الإصدار:** 1.0.2
 
-**النقل:** HTTP محلي إلى Ollama، ثم JSON إلى stdout أو API محلية اختيارية
+**النقل:** HTTP خاص إلى Ollama، ثم JSON إلى stdout أو API اختيارية محلية/سحابية
 
 **الوضع:** تخطيط فقط؛ لا تنفيذ
 
@@ -21,21 +21,38 @@ bash ./cela.sh --goal "Find an article" [--context "..." ] [--model "..." ] [--s
 
 `CELA_PLANNER_PROVIDER` يحدد مزوّد التخطيط المحلي (افتراضياً `ollama`)، ويُتحقق منه عبر `register_planner_provider(name, builder)` في `cela_sh.planner.registry`. `CELA_SQLITE_VEC_PATH` يحدد ملف الذاكرة المحلية. `CELA_ALLOW_OLLAMA_CONTAINER_HOST` افتراضيًا `false` (قيم البيئة: true/false/1/0)؛ تفعيله يسمح باسم `ollama` فقط لشبكة Docker الموثوقة، لا بعناوين LAN أو خدمات أخرى. `allow_container_host=False` معامل keyword اختياري جديد لكلا عميلَي Ollama، دون تغيير الاستدعاءات الموضعية السابقة.
 
-## API محلية اختيارية
+### أمر التعلّم الصريح
 
-تُثبت بـ`pip install -e '.[server]'` أو عبر `Dockerfile`. مسارات `/plan` و`/memory` و`/memory/search` موثقة في [دليل Docker](docker-deployment.md) و`/openapi.json`. الخطة نفس `Plan` المقفلة على dry-run. الذاكرة تُكتب صراحة بـPOST فقط، والبحث معزول بالجلسة. `/health` فحص حياة، لا جاهزية نموذج. لا يوجد Auth/Z أو rate limiting بعد؛ لا تنشرها على شبكة غير موثوقة.
+```bash
+bash ./cela.sh learn --session-id "project-notes" --content "تصحيح أو حقيقة يختار المشغّل حفظها"
+```
+
+يتضمن CLI أوامر الذاكرة التالية عند تفعيل `CELA_MEMORY_BACKEND=sqlite-vec` أو `qdrant`:
+
+- `learn --content ...`: يخزن ملاحظة حتى 8,000 حرف؛ استخدم `--content -` لقراءتها من stdin. `--type` هو `note` أو `correction`، ويمكن تكرار `--tag`.
+- `learn-file PATH`: يستورد Markdown أو UTF-8 text أو PDF نصيًا ويجزئه إلى مقاطع؛ PDF يتطلب `python -m pip install '.[documents]'`. يعامل `(scope/session_id, source_path)` كهوية للمصدر: الملف نفسه بلا تعديل يتخطى embeddings، والملف المعدّل يستبدل مقاطعه.
+- `search`: بحث دلالي اختياري عبر `--query`، أو تصفح وفلترة بوسم/نوع دون query؛ كل الوسوم المحددة مطلوبة.
+- `--scope project` هو الافتراضي ويتطلب `--session-id`. `--scope global` مشترك للمخزن كله ولا يقبل `--session-id`. التخطيط يدمج global مع جلسة المشروع، والتصحيحات تتقدم على الملاحظات عند ترتيب السياق.
+
+هذه واجهات كتابة صريحة؛ لا تُلتقط المحادثات أو الخطط تلقائيًا. انظر [دليل بناء المعرفة](learning.md) لحدود استخراج الملفات والتخزين والخصوصية.
+
+## API اختيارية محلية أو سحابية
+
+تُثبت بـ`pip install -e '.[server]'` أو عبر `Dockerfile`. مسارات `/plan` و`/memory` و`/memory/search` موثقة في [دليل Docker](docker-deployment.md) و`/openapi.json`. الخطة نفس `Plan` المقفلة على dry-run. كتابة الذاكرة صريحة عبر POST وتقبل scope/type/tags؛ البحث يدعم الوسوم والنوع والنطاقين، و`both` يجمع global مع project. `/health` فحص حياة، لا جاهزية نموذج.
+
+محليًا، المصادقة معطّلة افتراضيًا والمنافذ على loopback. ضبط `CELA_API_KEY` يفرض Bearer token على التخطيط والذاكرة؛ ويُلزم [overlay السحابي](cloud-deployment.md) بهذا المفتاح، مع إنهاء TLS عند ingress موثوق. المفتاح مشترك لمشغّل واحد، ولا يمنح تفويضًا بحسب `session_id`؛ لا تستخدمه لخدمة متعددة المستخدمين أو تضعه في JavaScript المتصفح. لا يوجد تحديد معدل على مستوى API، لذا أضف حماية ingress قبل فتحها لمستخدمين آخرين.
 
 ## الذاكرة
 
-- `MemoryStore` يحدد `add_memory` و`search_memory`؛ يمكن حقن تطبيق بديل.
+- `MemoryStore` يحدد `add_memory` و`search_memory`؛ ويوفر `list_memory` لتصفح الوسوم دون تضمين و`replace_source` لاستبدال استيراد ملف بأمان. المخزن الإضافي الذي لا يطبّق إحدى القدرتين لا يدعم مسارها في CLI/API.
 - تُسجَّل المخازن عبر `register_memory_backend(name, builder)` في `cela_sh.memory.registry`، وهذا السجل هو مصدر الحقيقة لقيم `CELA_MEMORY_BACKEND` المقبولة؛ الخطأ في قيمة غير مدعومة يسمّي القيم الصالحة.
 - `MockMemoryStore` مخزن مؤقت معجمي للاختبار، وليس بحثاً دلالياً.
-- `QdrantMemoryStore` يستخدم REST. تنشأ المجموعة عند أول إضافة، بحجم embedding المكتشف ومسافة `Cosine`، ويرفض اختلاف الحجم.
-- الذاكرة معطلة افتراضياً في CLI/Python. عند تفعيلها، يفرض `session_id` في استعلام المخزن ويتحقق منه محلياً قبل إعادة النتائج. حاوية API تفعّل sqlite-vec صراحة.
-- `SqliteVecMemoryStore` يستخدم مكتبة sqlite-vec الرسمية، و`vec_memories_<dimension>` بمسافة cosine وعمود metadata لترشيح الجلسة. `MATCH` مع `k` ومرشح الجلسة يجري البحث داخل الامتداد قبل top-k؛ ترحيل القواعد القديمة والكتابة ذريّان.
+- `QdrantMemoryStore` يستخدم REST. تنشأ المجموعة عند أول إضافة، بحجم embedding المكتشف ومسافة `Cosine`، ويرفض اختلاف الحجم. استيراد المصدر يستخدم point IDs حتمية مرتبطة بالجلسة والمسار ورقم المقطع، ثم يحذف المقاطع القديمة الزائدة بعد رفع النسخة الجديدة.
+- الذاكرة معطلة افتراضياً في CLI/Python. السجلات `project` تستخدم `session_id` مستقلًا؛ `global` مخزنة في نطاق داخلي محجوز وتُدمج مع المشروع عند التخطيط. لا تستخدم `session_id` كهوية أو سر، والذاكرة العالمية مشتركة عن قصد على المخزن نفسه.
+- `SqliteVecMemoryStore` يستخدم مكتبة sqlite-vec الرسمية، و`vec_memories_<dimension>` بمسافة cosine وعمود metadata لترشيح الجلسة. `MATCH` مع `k` ومرشح الجلسة يجري البحث داخل الامتداد قبل top-k؛ ترحيل القواعد القديمة وكتابة المصدر/متجهاته ذرّيان. جدول manifest يربط `(session_id, source_path)` ببصمة الملف ومقاطعها، فيسمح بتخطي الملف المطابق أو استبدال نسخته القديمة داخل معاملة واحدة.
 - نتيجة الذاكرة تحفظ مفاتيح `session_id`, `content`, `metadata`, `score` فقط. cosine similarity هي `1 - distance` ضمن `[-1, 1]`؛ حد vec0 الأصلي 4096 نتيجة، وحد HTTP هو 100. الأبعاد المختلفة لا تختلط في البحث.
 - `OllamaEmbeddingProvider.embed(text)` يستدعي `POST /api/embed` مع `model` و`input` كنص واحد.
-- المخطط لا يكتب ذكريات تلقائياً. يظل `add_memory` واجهة صريحة للمستدعي.
+- المخطط لا يكتب ذكريات تلقائياً. `learn` و`learn-file` و`POST /memory` كتابات صريحة؛ كل سجل يحمل `type` (`note` أو `correction`) ووسومًا وscope. تُقدّم corrections في سياق التخطيط لكنها تبقى بيانات غير موثوقة. لا يعيد ذلك تدريب أوزان النموذج.
 - Ollama على loopback أو الخدمة الداخلية المسموح بها صراحة. Qdrant البعيد يتطلب HTTPS ومفتاح API، ولا تحفظ المفتاح في المستودع.
 
 ## مخطط الخطة
@@ -64,11 +81,11 @@ bash ./cela.sh --goal "Find an article" [--context "..." ] [--model "..." ] [--s
 
 ## الأخطاء ورموز الخروج
 
-عند النجاح، stdout يحتوي JSON الخطة فقط. عند الفشل، لا توجد خطة بديلة؛ stderr يحتوي JSON خطأ.
+عند التخطيط، stdout يحتوي JSON الخطة فقط. أوامر `learn` و`learn-file` و`search` تكتب تأكيدًا أو نتائج JSON إلى stdout؛ عند الفشل، stderr يحتوي JSON خطأ، ولا توجد خطة بديلة.
 
 | الرمز | المعنى                                 |
 | ----: | -------------------------------------- |
-|   `0` | أُنتجت خطة صحيحة                       |
+|   `0` | نجح التخطيط أو أمر الذاكرة             |
 |   `1` | خطأ Planner معروف عام                  |
 |   `2` | مدخل CLI أو إعداد غير صالح             |
 |   `3` | تعذر الاتصال بـ Ollama أو انتهت المهلة |

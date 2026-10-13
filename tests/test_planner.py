@@ -149,10 +149,47 @@ class PlannerTests(unittest.TestCase):
         prompt_data = json.loads(prompt.split("\n", 1)[1])
         self.assertEqual(
             prompt_data["relevant_memories"],
-            [{"content": "Agent planning used local Ollama last time"}],
+            [
+                {
+                    "content": "Agent planning used local Ollama last time",
+                    "type": "note",
+                    "tags": [],
+                    "scope": "project",
+                }
+            ],
         )
         self.assertNotIn("session-a", prompt)
         self.assertEqual(len(store._storage), 2)
+
+    def test_global_memories_are_retrieved_and_corrections_outrank_notes(self):
+        from cela_sh.memory.scopes import GLOBAL_MEMORY_SESSION_ID
+
+        store = MockMemoryStore()
+        store.add_memory(
+            "project-a",
+            "production testing database production testing database",
+            {"type": "note", "tags": ["testing"], "scope": "project"},
+        )
+        store.add_memory(
+            GLOBAL_MEMORY_SESSION_ID,
+            "Correction: do not use production in tests.",
+            {"type": "correction", "tags": ["testing", "database"], "scope": "global"},
+        )
+        planner = OllamaPlanner(memory_store=store, memory_limit=1)
+
+        _, memories = planner._prepare_request("production testing database", session_id="project-a")
+
+        self.assertEqual(
+            memories,
+            [
+                {
+                    "content": "Correction: do not use production in tests.",
+                    "type": "correction",
+                    "tags": ["database", "testing"],
+                    "scope": "global",
+                }
+            ],
+        )
 
     def test_memory_requires_session_scope_and_fails_closed(self):
         store = MockMemoryStore()

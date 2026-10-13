@@ -1,14 +1,12 @@
-"""Offline guard: the version string must not drift between its six locations.
+"""Offline guard: the version string must not drift between its eight files.
 
-`CHANGELOG.md` promises a single current version. Nothing else enforced it, and
-the inventory it listed was incomplete: `src/cela_sh/server.py` passes `version=`
-to FastAPI, which is published to callers through `/openapi.json` and `/docs`,
-and `SECURITY.md` names the supported version. Bumping only the four originally
-documented files therefore shipped a public OpenAPI contract advertising a stale
-version while the package metadata claimed a new one.
+`CHANGELOG.md` promises one current version. The version appears in package and
+lockfile metadata, public OpenAPI (`server.py`), the supported-version policy,
+and versioned architecture, protocol, and error-contract docs. If any one drifts,
+callers can see a stale contract even while package metadata claims a new version.
 
-This test reads all six, plus the newest `CHANGELOG.md` heading, and fails on any
-difference. It needs no network, no Docker, and no Ollama.
+This test reads all eight files, plus the newest `CHANGELOG.md` heading, and fails
+on any difference. It needs no network, no Docker, and no Ollama.
 """
 
 import json
@@ -41,12 +39,15 @@ class VersionConsistencyTests(unittest.TestCase):
             f"{label} says {actual} but pyproject.toml says {self.expected}",
         )
 
-    def test_package_json_matches(self):
+    def test_package_metadata_matches(self):
         data = json.loads((ROOT / "ccelia2027" / "package.json").read_text(encoding="utf-8"))
         self.assertVersion(data["version"], "ccelia2027/package.json")
+        lock = json.loads((ROOT / "ccelia2027" / "package-lock.json").read_text(encoding="utf-8"))
+        self.assertVersion(lock["version"], "ccelia2027/package-lock.json")
+        self.assertVersion(lock["packages"][""]["version"], "ccelia2027/package-lock.json root package")
 
     def test_documentation_headers_match(self):
-        for name in ("docs/architecture.md", "docs/protocol.md"):
+        for name in ("docs/architecture.md", "docs/protocol.md", "docs/api-errors.md"):
             with self.subTest(document=name):
                 text = (ROOT / name).read_text(encoding="utf-8")
                 self.assertVersion(_search(rf"\*\*الإصدار:\*\*\s*{SEMVER}", text, name), name)

@@ -59,8 +59,8 @@ class FakeQdrantResponse:
 class FakeQdrantSession:
     """An in-memory stand-in for ``requests.Session`` that behaves like Qdrant.
 
-    Supports the four calls the adapter makes: collection GET/PUT, points PUT,
-    and points/query. Set :attr:`leak_other_sessions` to make ``points/query``
+    Supports the collection, point-write, semantic-query, and metadata-scroll
+    calls the adapter makes. Set :attr:`leak_other_sessions` to make ``points/query``
     ignore the session filter, which simulates a misconfigured or hostile server
     and proves the adapter's own filtering is not the only line of defence.
     """
@@ -128,8 +128,17 @@ class FakeQdrantSession:
         if len(parts) == 2 and parts[1] == "points" and method == "PUT":
             if collection is None:
                 return FakeQdrantResponse({"status": "error", "error": "no such collection"}, 404)
+            stored_by_id = {point.get("id"): point for point in collection["points"]}
             for point in body.get("points", []):
-                collection["points"].append(deepcopy(point))
+                stored_by_id[point.get("id")] = deepcopy(point)
+            collection["points"] = list(stored_by_id.values())
+            return FakeQdrantResponse({"status": "ok", "result": {}})
+
+        if len(parts) == 3 and parts[1] == "points" and parts[2] == "delete" and method == "POST":
+            if collection is None:
+                return FakeQdrantResponse({"status": "error", "error": "no such collection"}, 404)
+            delete_ids = set(body.get("points", []))
+            collection["points"] = [point for point in collection["points"] if point.get("id") not in delete_ids]
             return FakeQdrantResponse({"status": "ok", "result": {}})
 
         if len(parts) == 3 and parts[1] == "points" and parts[2] == "query" and method == "POST":
@@ -137,7 +146,32 @@ class FakeQdrantSession:
                 return FakeQdrantResponse({"status": "error", "error": "no such collection"}, 404)
             return FakeQdrantResponse({"status": "ok", "result": {"points": self._query(collection, body)}})
 
+        if len(parts) == 3 and parts[1] == "points" and parts[2] == "scroll" and method == "POST":
+            if collection is None:
+                return FakeQdrantResponse({"status": "error", "error": "no such collection"}, 404)
+            return FakeQdrantResponse(
+                {"status": "ok", "result": {"points": self._scroll(collection, body), "next_page_offset": None}}
+            )
+
         return FakeQdrantResponse({"status": "error", "error": "unsupported call"}, 400)
+
+    def _scroll(self, collection: dict[str, Any], body: dict[str, Any]) -> list[dict[str, Any]]:
+        required = (body.get("filter") or {}).get("must", [])
+        matching = []
+        for point in collection["points"]:
+            payload = point.get("payload", {})
+            accepted = True
+            for clause in required:
+                expected = (clause.get("match") or {}).get("value")
+                actual = payload.get(clause.get("key"))
+                matches = expected in actual if isinstance(actual, list) else actual == expected
+                if not matches:
+                    accepted = False
+                    break
+            if accepted:
+                matching.append({"id": point.get("id"), "payload": deepcopy(payload)})
+        limit = body.get("limit")
+        return matching[:limit] if isinstance(limit, int) and limit > 0 else matching
 
     def _query(self, collection: dict[str, Any], body: dict[str, Any]) -> list[dict[str, Any]]:
         query_vector = body.get("query") or []

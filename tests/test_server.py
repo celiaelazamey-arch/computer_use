@@ -55,8 +55,74 @@ class ServerTests(unittest.TestCase):
         with closing(sqlite3.connect(self.path)) as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM memories").fetchone()[0], 0)
 
+    def test_configured_api_key_protects_routes_but_not_liveness_or_docs(self):
+        api_key = "0f" * 32
+        settings = Settings(memory_backend="sqlite-vec", sqlite_vec_path=self.path, api_key=api_key)
+        with TestClient(create_app(settings, self.planner)) as client:
+            self.assertEqual(client.get("/health").status_code, 200)
+            self.assertEqual(client.get("/docs").status_code, 200)
+
+            plan_payload = {"goal": "Read a public page", "session_id": "session-a"}
+            memory_payload = {"session_id": "session-a", "content": "private note"}
+            protected_requests = (
+                ("/plan", plan_payload),
+                ("/memory", memory_payload),
+                ("/memory/search", {"session_id": "session-a", "query": "note"}),
+            )
+            for path, payload in protected_requests:
+                with self.subTest(path=path):
+                    response = client.post(path, json=payload)
+                    self.assertEqual(response.status_code, 401)
+                    self.assertEqual(
+                        response.json(),
+                        {"error": {"code": "authentication_required", "message": "A valid bearer token is required."}},
+                    )
+                    self.assertEqual(response.headers["www-authenticate"], "Bearer")
+                    self.assertNotIn(api_key, response.text)
+
+            wrong_token = client.post(
+                "/plan",
+                json=plan_payload,
+                headers={"Authorization": "Bearer " + "ff" * 32},
+            )
+            self.assertEqual(wrong_token.status_code, 401)
+            self.assertNotIn("steps", wrong_token.json())
+            self.post.assert_not_called()
+            self.assertEqual(self.embedding.inputs, [])
+
+            auth = {"Authorization": "Bearer " + api_key}
+            stored = client.post("/memory", json=memory_payload, headers=auth)
+            self.assertEqual(stored.status_code, 201)
+            search = client.post(
+                "/memory/search",
+                json={"session_id": "session-a", "query": "note"},
+                headers=auth,
+            )
+            self.assertEqual(search.status_code, 200)
+            self.assertEqual(search.json()[0]["content"], "private note")
+            planned = client.post("/plan", json=plan_payload, headers=auth)
+            self.assertEqual(planned.status_code, 200)
+            self.assertTrue(planned.json()["dry_run"])
+            self.assertFalse(planned.json()["execution_enabled"])
+
+            schema = client.get("/openapi.json").json()
+            for path in ("/plan", "/memory", "/memory/search"):
+                self.assertEqual(schema["paths"][path]["post"]["security"], [{"HTTPBearer": []}])
+            self.assertNotIn("security", schema["paths"]["/health"]["get"])
+
     def test_explicit_memory_write_and_scoped_native_search(self):
-        payload = {"session_id": "session-a", "content": "ذاكرة عربية Ollama", "metadata": {"source": "test"}}
+        payload = {
+            "session_id": "session-a",
+            "content": "ذاكرة عربية Ollama",
+            "metadata": {
+                "source": "test",
+                "source_path": "docs/guide.md",
+                "source_hash": "a" * 64,
+                "content_hash": "b" * 64,
+                "chunk_index": 1,
+                "chunk_count": 1,
+            },
+        }
         response = self.client.post("/memory", json=payload)
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json(), {"stored": True})
@@ -65,12 +131,48 @@ class ServerTests(unittest.TestCase):
         response = self.client.post("/memory/search", json={"session_id": "session-a", "query": "Ollama", "limit": 2})
         self.assertEqual(response.status_code, 200)
         result = response.json()[0]
-        self.assertEqual(set(result), {"session_id", "content", "metadata", "score"})
+        self.assertEqual(set(result), {"session_id", "scope", "content", "metadata", "score"})
         self.assertEqual(result["session_id"], "session-a")
+        self.assertEqual(result["scope"], "project")
         self.assertEqual(result["content"], payload["content"])
-        self.assertEqual(result["metadata"], payload["metadata"])
+        self.assertEqual(
+            result["metadata"],
+            {"source": "test", "scope": "project", "type": "note", "tags": []},
+        )
         self.assertEqual(len(response.json()), 1)
         self.post.assert_not_called()
+
+    def test_global_and_project_memory_support_tags_and_corrections(self):
+        global_payload = {
+            "scope": "global",
+            "content": "Never use production during tests.",
+            "type": "correction",
+            "tags": ["testing", "database"],
+        }
+        project_payload = {
+            "session_id": "session-a",
+            "content": "Project deployment notes.",
+            "tags": ["deployment"],
+        }
+        self.assertEqual(self.client.post("/memory", json=global_payload).status_code, 201)
+        self.assertEqual(self.client.post("/memory", json=project_payload).status_code, 201)
+
+        global_results = self.client.post(
+            "/memory/search",
+            json={"scope": "global", "tags": ["TESTING"], "type": "correction"},
+        )
+        self.assertEqual(global_results.status_code, 200)
+        self.assertEqual(len(global_results.json()), 1)
+        self.assertIsNone(global_results.json()[0]["session_id"])
+        self.assertEqual(global_results.json()[0]["scope"], "global")
+        self.assertEqual(global_results.json()[0]["metadata"]["tags"], ["database", "testing"])
+
+        both_results = self.client.post(
+            "/memory/search",
+            json={"scope": "both", "session_id": "session-a", "tags": ["deployment"]},
+        )
+        self.assertEqual(both_results.status_code, 200)
+        self.assertEqual([row["scope"] for row in both_results.json()], ["project"])
 
     def test_plan_uses_memory_but_never_stores_a_plan(self):
         self.store.add_memory("session-a", "Ollama planning history")
@@ -113,7 +215,12 @@ class ServerTests(unittest.TestCase):
             ("/memory", {"session_id": "s", "content": "x" * 8001}),
             ("/memory", {"session_id": " ", "content": "usable"}),
             ("/memory", {"session_id": "s", "content": "usable", "metadata": []}),
+            ("/memory", {"scope": "project", "content": "usable"}),
+            ("/memory", {"scope": "global", "session_id": "s", "content": "usable"}),
+            ("/memory", {"session_id": "s", "content": "usable", "tags": ["two words"]}),
             ("/memory/search", {"session_id": "s", "query": " "}),
+            ("/memory/search", {"scope": "both", "query": "usable"}),
+            ("/memory/search", {"scope": "global", "session_id": "s"}),
             ("/memory/search", {"session_id": "s", "query": "usable", "limit": True}),
             ("/memory/search", {"session_id": "s", "query": "usable", "limit": 0}),
             ("/memory/search", {"session_id": "s", "query": "usable", "limit": 101}),

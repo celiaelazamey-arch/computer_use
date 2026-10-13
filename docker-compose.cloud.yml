@@ -1,0 +1,6 @@
+# Cloud-safe overlay for a single-operator Linux VM deployment.
+# The base Compose file still binds the API and Ollama to host loopback only.
+services:
+  cela-sh-api:
+    environment:
+      CELA_API_KEY: "${CELA_API_KEY:?Set a random CELA_API_KEY before cloud deployment}"

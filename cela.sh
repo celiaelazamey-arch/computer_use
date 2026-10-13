@@ -166,6 +166,14 @@ case "${1:-}" in
     docker compose --profile api up -d --build cela-sh-api
     exit 0
     ;;
+  services-up-cloud)
+    if ! command -v docker >/dev/null 2>&1; then
+      printf 'Docker Compose is required for the cloud API deployment.\n' >&2
+      exit 2
+    fi
+    docker compose -f docker-compose.yml -f docker-compose.cloud.yml --profile api up -d --build cela-sh-api
+    exit 0
+    ;;
   services-stop)
     if ! command -v docker >/dev/null 2>&1; then
       printf 'Docker Compose is required to stop local services.\n' >&2

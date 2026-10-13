@@ -13,6 +13,8 @@ import sqlite_vec
 
 from .base import MemoryStore, MemoryStoreError
 from .embeddings import EmbeddingProvider
+from .metadata import metadata_matches, validate_memory_filters
+from .sources import validate_source_replacement
 
 # Limits in the pinned sqlite-vec release. A large requested limit still returns
 # up to this many neighbours, never an invalid native KNN query.
@@ -124,6 +126,29 @@ class SqliteVecMemoryStore(MemoryStore):
                     raise MemoryStoreError("The SQLite memory database has an unsupported schema.")
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_memories_session_id ON memories (session_id)"
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS memory_sources (
+                        session_id TEXT NOT NULL,
+                        source_path TEXT NOT NULL,
+                        source_hash TEXT NOT NULL,
+                        imported_at TEXT NOT NULL,
+                        chunk_count INTEGER NOT NULL CHECK (chunk_count > 0),
+                        PRIMARY KEY (session_id, source_path)
+                    )"""
+                )
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS memory_source_chunks (
+                        session_id TEXT NOT NULL,
+                        source_path TEXT NOT NULL,
+                        chunk_index INTEGER NOT NULL CHECK (chunk_index > 0),
+                        memory_id INTEGER NOT NULL UNIQUE,
+                        PRIMARY KEY (session_id, source_path, chunk_index)
+                    )"""
+                )
+                conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_memory_source_chunks_path "
+                    "ON memory_source_chunks (session_id, source_path)"
                 )
         except sqlite3.Error as exc:
             raise MemoryStoreError("Failed to initialize the sqlite-vec memory database.") from exc
@@ -306,3 +331,207 @@ class SqliteVecMemoryStore(MemoryStore):
                 }
             )
         return results
+
+    def list_memory(
+        self,
+        session_id: str,
+        limit: int = 100,
+        *,
+        tags: list[str] | None = None,
+        memory_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List recent records in one session, optionally filtering metadata."""
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("session_id must not be blank")
+        limit, clean_tags, clean_type = validate_memory_filters(limit, tags, memory_type)
+        clean_session = session_id.strip()
+
+        results = []
+        try:
+            with closing(self._get_connection()) as conn:
+                cursor = conn.execute(
+                    "SELECT session_id, content, metadata FROM memories WHERE session_id = ? ORDER BY id DESC",
+                    (clean_session,),
+                )
+                batch_size = min(max(limit, 128), 512)
+                while len(results) < limit:
+                    rows = cursor.fetchmany(batch_size)
+                    if not rows:
+                        break
+                    for row in rows:
+                        try:
+                            metadata = json.loads(row["metadata"])
+                        except (TypeError, json.JSONDecodeError):
+                            metadata = {}
+                        if not isinstance(metadata, dict) or not metadata_matches(
+                            metadata, tags=clean_tags, memory_type=clean_type
+                        ):
+                            continue
+                        results.append(
+                            {
+                                "session_id": row["session_id"],
+                                "content": row["content"],
+                                "metadata": metadata,
+                                "score": 0.0,
+                            }
+                        )
+                        if len(results) == limit:
+                            break
+        except sqlite3.Error as exc:
+            raise MemoryStoreError("Failed to list memories in sqlite-vec.") from exc
+        return results
+
+    def replace_source(
+        self,
+        session_id: str,
+        source_path: str,
+        source_hash: str,
+        chunks: list[tuple[str, dict[str, Any]]],
+    ) -> dict[str, Any]:
+        """Replace one source's chunks in one transaction, skipping unchanged files."""
+        clean_session, clean_path, clean_hash, records = validate_source_replacement(
+            session_id, source_path, source_hash, chunks
+        )
+
+        def unchanged_result(conn: sqlite3.Connection) -> dict[str, Any] | None:
+            source = conn.execute(
+                "SELECT source_hash, chunk_count FROM memory_sources "
+                "WHERE session_id = ? AND source_path = ?",
+                (clean_session, clean_path),
+            ).fetchone()
+            if source is None or source["source_hash"] != clean_hash or source["chunk_count"] != len(records):
+                return None
+            linked_rows = conn.execute(
+                """SELECT memories.metadata
+                   FROM memory_source_chunks
+                   JOIN memories ON memories.id = memory_source_chunks.memory_id
+                   WHERE memory_source_chunks.session_id = ? AND memory_source_chunks.source_path = ?
+                   ORDER BY memory_source_chunks.chunk_index""",
+                (clean_session, clean_path),
+            ).fetchall()
+            if len(linked_rows) != len(records):
+                return None
+            for row, (_, expected_metadata) in zip(linked_rows, records, strict=True):
+                try:
+                    actual_metadata = json.loads(row["metadata"])
+                except (TypeError, json.JSONDecodeError):
+                    return None
+                if (
+                    not isinstance(actual_metadata, dict)
+                    or actual_metadata.get("source_path") != clean_path
+                    or actual_metadata.get("source_hash") != clean_hash
+                    or actual_metadata.get("content_hash") != expected_metadata.get("content_hash")
+                    or actual_metadata.get("chunk_index") != expected_metadata.get("chunk_index")
+                    or actual_metadata.get("chunk_count") != len(records)
+                ):
+                    return None
+            return {
+                "status": "unchanged",
+                "chunks_stored": 0,
+                "replaced_chunks": 0,
+                "existing_chunks": len(records),
+            }
+
+        # Check the source manifest before any embedding work. A second check
+        # under BEGIN IMMEDIATE below makes concurrent imports idempotent too.
+        try:
+            with closing(self._get_connection()) as conn:
+                result = unchanged_result(conn)
+                if result is not None:
+                    return result
+        except sqlite3.Error as exc:
+            raise MemoryStoreError("Failed to read the source manifest in sqlite-vec.") from exc
+
+        vectors = [(content, metadata, json.dumps(self._embed(content), allow_nan=False)) for content, metadata in records]
+        imported_at = records[0][1]["imported_at"]
+
+        try:
+            with closing(self._get_connection()) as conn, conn:
+                conn.execute("BEGIN IMMEDIATE")
+                result = unchanged_result(conn)
+                if result is not None:
+                    return result
+
+                previous = conn.execute(
+                    "SELECT chunk_count FROM memory_sources WHERE session_id = ? AND source_path = ?",
+                    (clean_session, clean_path),
+                ).fetchone()
+                previous_count = previous["chunk_count"] if previous is not None else 0
+                old_rows = conn.execute(
+                    """SELECT source_chunk.memory_id, memories.embedding_dim
+                       FROM memory_source_chunks AS source_chunk
+                       LEFT JOIN memories ON memories.id = source_chunk.memory_id
+                       WHERE source_chunk.session_id = ? AND source_chunk.source_path = ?""",
+                    (clean_session, clean_path),
+                ).fetchall()
+
+                # Validate every vector before the delete/insert section. Any
+                # failure rolls back the whole source replacement, preserving vN.
+                checked = [
+                    (content, metadata, vector_json, self._check_native_vector(conn, vector_json))
+                    for content, metadata, vector_json in vectors
+                ]
+                for row in old_rows:
+                    dimension = row["embedding_dim"]
+                    memory_id = row["memory_id"]
+                    if dimension is None or memory_id is None:
+                        continue
+                    if isinstance(dimension, bool) or not isinstance(dimension, int) or not 1 <= dimension <= _MAX_DIMENSIONS:
+                        raise MemoryStoreError("Source metadata references an invalid vector dimension.")
+                    table_name = f"vec_memories_{dimension}"
+                    exists = conn.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                        (table_name,),
+                    ).fetchone()
+                    if exists is not None:
+                        conn.execute(f"DELETE FROM {table_name} WHERE rowid = ?", (memory_id,))
+                conn.execute(
+                    "DELETE FROM memory_source_chunks WHERE session_id = ? AND source_path = ?",
+                    (clean_session, clean_path),
+                )
+                # The source-link rows were removed above, so delete the old
+                # memory IDs captured before that operation explicitly.
+                for row in old_rows:
+                    if row["memory_id"] is not None:
+                        conn.execute("DELETE FROM memories WHERE id = ?", (row["memory_id"],))
+
+                for index, (content, metadata, vector_json, dimension) in enumerate(checked, start=1):
+                    table_name = self._ensure_vec_table(conn, dimension)
+                    cursor = conn.execute(
+                        "INSERT INTO memories (session_id, content, metadata, embedding_dim) VALUES (?, ?, ?, ?)",
+                        (
+                            clean_session,
+                            content,
+                            json.dumps(metadata, ensure_ascii=False, allow_nan=False),
+                            dimension,
+                        ),
+                    )
+                    memory_id = cursor.lastrowid
+                    conn.execute(
+                        f"INSERT INTO {table_name} (rowid, session_id, embedding) VALUES (?, ?, ?)",
+                        (memory_id, clean_session, vector_json),
+                    )
+                    conn.execute(
+                        "INSERT INTO memory_source_chunks "
+                        "(session_id, source_path, chunk_index, memory_id) VALUES (?, ?, ?, ?)",
+                        (clean_session, clean_path, index, memory_id),
+                    )
+                conn.execute(
+                    """INSERT INTO memory_sources
+                       (session_id, source_path, source_hash, imported_at, chunk_count)
+                       VALUES (?, ?, ?, ?, ?)
+                       ON CONFLICT(session_id, source_path) DO UPDATE SET
+                           source_hash = excluded.source_hash,
+                           imported_at = excluded.imported_at,
+                           chunk_count = excluded.chunk_count""",
+                    (clean_session, clean_path, clean_hash, imported_at, len(records)),
+                )
+        except sqlite3.Error as exc:
+            raise MemoryStoreError("Failed to replace source memories in sqlite-vec.") from exc
+
+        return {
+            "status": "updated" if previous is not None else "imported",
+            "chunks_stored": len(records),
+            "replaced_chunks": previous_count,
+            "existing_chunks": len(records),
+        }

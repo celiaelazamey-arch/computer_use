@@ -56,6 +56,186 @@
         "type": "non_blank"
       }
     ],
+    "cli_subcommands": {
+      "learn": [
+        {
+          "default": "'==SUPPRESS=='",
+          "nargs": "0",
+          "options": [
+            "--help",
+            "-h"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--content"
+          ],
+          "required": true,
+          "type": "_content"
+        },
+        {
+          "default": "'project'",
+          "nargs": null,
+          "options": [
+            "--scope"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--session-id"
+          ],
+          "required": false,
+          "type": "_session_id"
+        },
+        {
+          "default": "'note'",
+          "nargs": null,
+          "options": [
+            "--type"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "[]",
+          "nargs": null,
+          "options": [
+            "--tag"
+          ],
+          "required": false,
+          "type": "_tag"
+        }
+      ],
+      "learn-file": [
+        {
+          "default": "'==SUPPRESS=='",
+          "nargs": "0",
+          "options": [
+            "--help",
+            "-h"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [],
+          "required": true,
+          "type": null
+        },
+        {
+          "default": "'project'",
+          "nargs": null,
+          "options": [
+            "--scope"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--session-id"
+          ],
+          "required": false,
+          "type": "_session_id"
+        },
+        {
+          "default": "'note'",
+          "nargs": null,
+          "options": [
+            "--type"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "[]",
+          "nargs": null,
+          "options": [
+            "--tag"
+          ],
+          "required": false,
+          "type": "_tag"
+        }
+      ],
+      "search": [
+        {
+          "default": "'==SUPPRESS=='",
+          "nargs": "0",
+          "options": [
+            "--help",
+            "-h"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--query"
+          ],
+          "required": false,
+          "type": "_query"
+        },
+        {
+          "default": "'project'",
+          "nargs": null,
+          "options": [
+            "--scope"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--session-id"
+          ],
+          "required": false,
+          "type": "_session_id"
+        },
+        {
+          "default": "None",
+          "nargs": null,
+          "options": [
+            "--type"
+          ],
+          "required": false,
+          "type": null
+        },
+        {
+          "default": "[]",
+          "nargs": null,
+          "options": [
+            "--tag"
+          ],
+          "required": false,
+          "type": "_tag"
+        },
+        {
+          "default": "20",
+          "nargs": null,
+          "options": [
+            "--limit"
+          ],
+          "required": false,
+          "type": "_limit"
+        }
+      ]
+    },
     "exit_codes": {
       "cli_usage_error": 2,
       "configuration_error": 2,
@@ -151,6 +331,8 @@
         "kind": "class",
         "methods": {
           "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "list_memory": "(self, session_id: str, limit: int = 100, *, tags: list[str] | None = None, memory_type: str | None = None) -> list[dict[str, typing.Any]]",
+          "replace_source": "(self, session_id: str, source_path: str, source_hash: str, chunks: list[tuple[str, dict[str, typing.Any]]]) -> dict[str, typing.Any]",
           "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
         }
       },
@@ -171,6 +353,8 @@
         "methods": {
           "__init__": "(self) -> None",
           "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "list_memory": "(self, session_id: str, limit: int = 100, *, tags: list[str] | None = None, memory_type: str | None = None) -> list[dict[str, typing.Any]]",
+          "replace_source": "(self, session_id: str, source_path: str, source_hash: str, chunks: list[tuple[str, dict[str, typing.Any]]]) -> dict[str, typing.Any]",
           "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
         }
       },
@@ -303,6 +487,8 @@
         "methods": {
           "__init__": "(self, collection_name: str = 'agent_memory', qdrant_url: str = 'http://127.0.0.1:6333', embedding_provider: cela_sh.memory.embeddings.EmbeddingProvider | None = None, timeout: tuple[float, float] = (3.05, 15.0), api_key: str | None = None, session: requests.sessions.Session | None = None) -> None",
           "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "list_memory": "(self, session_id: str, limit: int = 100, *, tags: list[str] | None = None, memory_type: str | None = None) -> list[dict[str, typing.Any]]",
+          "replace_source": "(self, session_id: str, source_path: str, source_hash: str, chunks: list[tuple[str, dict[str, typing.Any]]]) -> dict[str, typing.Any]",
           "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
         }
       },
@@ -327,6 +513,10 @@
         "fields": {
           "allow_ollama_container_host": {
             "annotation": "bool",
+            "required": false
+          },
+          "api_key": {
+            "annotation": "str | None",
             "required": false
           },
           "connect_timeout": {
@@ -378,10 +568,10 @@
             "required": false
           }
         },
-        "init": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0, allow_ollama_container_host: bool = False, planner_provider: str = 'ollama') -> None",
+        "init": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0, allow_ollama_container_host: bool = False, planner_provider: str = 'ollama', api_key: str | None = None) -> None",
         "kind": "class",
         "methods": {
-          "__init__": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0, allow_ollama_container_host: bool = False, planner_provider: str = 'ollama') -> None"
+          "__init__": "(self, ollama_url: str = 'http://127.0.0.1:11434', planner_model: str = 'qwen2.5:3b', embedding_model: str = 'nomic-embed-text', memory_backend: str = 'disabled', memory_limit: int = 3, sqlite_vec_path: str = 'cela_memory.db', qdrant_url: str = 'http://127.0.0.1:6333', qdrant_collection: str = 'agent_memory', qdrant_api_key: str | None = None, connect_timeout: float = 3.05, read_timeout: float = 60.0, allow_ollama_container_host: bool = False, planner_provider: str = 'ollama', api_key: str | None = None) -> None"
         }
       },
       "SqliteVecMemoryStore": {
@@ -393,6 +583,8 @@
         "methods": {
           "__init__": "(self, db_path: str, embedding_provider: cela_sh.memory.embeddings.EmbeddingProvider, timeout: float = 5.0) -> None",
           "add_memory": "(self, session_id: str, content: str, metadata: dict[str, typing.Any] | None = None) -> bool",
+          "list_memory": "(self, session_id: str, limit: int = 100, *, tags: list[str] | None = None, memory_type: str | None = None) -> list[dict[str, typing.Any]]",
+          "replace_source": "(self, session_id: str, source_path: str, source_hash: str, chunks: list[tuple[str, dict[str, typing.Any]]]) -> dict[str, typing.Any]",
           "search_memory": "(self, query: str, session_id: str, limit: int = 3) -> list[dict[str, typing.Any]]"
         }
       },

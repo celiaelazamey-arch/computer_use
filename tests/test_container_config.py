@@ -32,6 +32,7 @@ def requirements(path):
 class ContainerConfigTests(unittest.TestCase):
     def setUp(self):
         self.compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+        self.cloud_compose = yaml.safe_load((ROOT / "docker-compose.cloud.yml").read_text())
         self.dockerfile = (ROOT / "Dockerfile").read_text()
 
     def test_requirement_files_match_installable_package_metadata(self):
@@ -85,16 +86,27 @@ class ContainerConfigTests(unittest.TestCase):
         self.assertEqual(self.compose["services"]["ollama"]["healthcheck"]["test"], ["CMD", "ollama", "list"])
         self.assertNotIn(":latest", self.compose["services"]["ollama"]["image"])
 
+    def test_cloud_overlay_requires_api_auth_without_widening_host_ports(self):
+        api = self.cloud_compose["services"]["cela-sh-api"]
+        self.assertIn("CELA_API_KEY", api["environment"])
+        self.assertIn("${CELA_API_KEY:?", api["environment"]["CELA_API_KEY"])
+        self.assertEqual(self.compose["services"]["cela-sh-api"]["ports"], ["127.0.0.1:${CELA_API_PORT:-8000}:8000"])
+        self.assertEqual(self.compose["services"]["ollama"]["ports"], ["127.0.0.1:11434:11434"])
+        cloud_guide = (ROOT / "docs/cloud-deployment.md").read_text()
+        self.assertIn("TLS", cloud_guide)
+        self.assertIn("127.0.0.1:8000", cloud_guide)
+
     def test_compose_uses_the_actual_cela_environment_names(self):
         env = self.compose["services"]["cela-sh-api"]["environment"]
         self.assertTrue(all(key.startswith("CELA_") for key in env))
-        resolved = {key: re.sub(r"\$\{[A-Z_]+:-([^}]+)\}", r"\1", value) for key, value in env.items()}
+        resolved = {key: re.sub(r"\$\{[A-Z_]+:-([^}]*)\}", r"\1", value) for key, value in env.items()}
         with patch.dict(os.environ, resolved, clear=True):
             settings = Settings.from_env()
         self.assertEqual(settings.ollama_url, "http://ollama:11434")
         self.assertTrue(settings.allow_ollama_container_host)
         self.assertEqual(settings.memory_backend, "sqlite-vec")
         self.assertEqual(settings.sqlite_vec_path, "/app/data/cela_memory.db")
+        self.assertIsNone(settings.api_key)
 
     def test_api_hardening_and_original_optional_qdrant_are_preserved(self):
         api = self.compose["services"]["cela-sh-api"]
@@ -113,11 +125,12 @@ class ContainerConfigTests(unittest.TestCase):
             binary.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_TEST_LOG"\n')
             binary.chmod(0o755)
             env = {**os.environ, "PATH": directory + os.pathsep + os.environ.get("PATH", ""), "DOCKER_TEST_LOG": str(log)}
-            for command in ("services-up-api", "services-stop"):
+            for command in ("services-up-api", "services-up-cloud", "services-stop"):
                 result = subprocess.run(["bash", str(ROOT / "cela.sh"), command], cwd=ROOT, env=env, capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(log.read_text().splitlines(), [
                 "compose --profile api up -d --build cela-sh-api",
+                "compose -f docker-compose.yml -f docker-compose.cloud.yml --profile api up -d --build cela-sh-api",
                 "compose --profile api --profile memory stop",
             ])
             self.assertNotIn("down -v", log.read_text())

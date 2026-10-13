@@ -1,5 +1,6 @@
 """Exercise the real, locally loaded sqlite-vec extension, never a fake index."""
 
+import hashlib
 import json
 import sqlite3
 import struct
@@ -11,6 +12,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cela_sh.memory import EmbeddingProvider, MemoryStoreError, SqliteVecMemoryStore
+from cela_sh.memory.sources import content_hash
 
 
 class VectorEmbedding(EmbeddingProvider):
@@ -40,6 +42,32 @@ class TrackingConnection(sqlite3.Connection):
     def close(self):
         self.closed = True
         super().close()
+
+
+def source_records(source_path, source_hash, contents, *, imported_at="2026-10-12T12:00:00+00:00"):
+    count = len(contents)
+    records = []
+    for index, content in enumerate(contents, start=1):
+        records.append(
+            (
+                content,
+                {
+                    "scope": "project",
+                    "type": "note",
+                    "tags": ["docs"],
+                    "source": "explicit_cli_file_learning",
+                    "source_name": source_path.rsplit("/", 1)[-1],
+                    "source_path": source_path,
+                    "source_hash": source_hash,
+                    "source_sha256": source_hash,
+                    "content_hash": content_hash(content),
+                    "imported_at": imported_at,
+                    "chunk_index": index,
+                    "chunk_count": count,
+                },
+            )
+        )
+    return records
 
 
 class SqliteVecStoreTests(unittest.TestCase):
@@ -141,6 +169,122 @@ class SqliteVecStoreTests(unittest.TestCase):
             self.assertIsNone(conn.execute(
                 "SELECT name FROM sqlite_master WHERE name = 'vec_memories_4'"
             ).fetchone())
+
+    def test_list_memory_filters_scoped_records_by_type_and_tags_without_embedding(self):
+        store = self.make_store()
+        store.add_memory(
+            "session-a",
+            "Never use production in tests.",
+            {"type": "correction", "tags": ["testing", "database"], "scope": "project"},
+        )
+        store.add_memory("session-a", "Deployment checklist", {"type": "note", "tags": ["deployment"]})
+        store.add_memory("session-b", "Other project", {"type": "correction", "tags": ["testing", "database"]})
+        embed_count = len(self.embedding.inputs)
+
+        results = store.list_memory("session-a", limit=10, tags=["testing", "database"], memory_type="correction")
+
+        self.assertEqual([result["content"] for result in results], ["Never use production in tests."])
+        self.assertEqual(results[0]["score"], 0.0)
+        self.assertEqual(len(self.embedding.inputs), embed_count)
+
+    def test_replace_source_skips_unchanged_hash_and_atomically_replaces_old_chunks(self):
+        store = self.make_store()
+        source_path = "docs/guide.md"
+        first_hash = hashlib.sha256(b"guide-v1").hexdigest()
+        first = store.replace_source(
+            "project-a",
+            source_path,
+            first_hash,
+            source_records(source_path, first_hash, ["old staging rule", "old production rule", "old backup rule"]),
+        )
+        self.assertEqual(first["status"], "imported")
+        self.assertEqual(first["chunks_stored"], 3)
+        other_path = "docs/other.md"
+        other_hash = hashlib.sha256(b"other guide").hexdigest()
+        store.replace_source("project-a", other_path, other_hash, source_records(other_path, other_hash, ["keep independent source"]))
+        embedding_count = len(self.embedding.inputs)
+
+        unchanged = store.replace_source(
+            "project-a",
+            source_path,
+            first_hash,
+            source_records(
+                source_path,
+                first_hash,
+                ["old staging rule", "old production rule", "old backup rule"],
+                imported_at="2026-10-13T12:00:00+00:00",
+            ),
+        )
+        self.assertEqual(unchanged["status"], "unchanged")
+        self.assertEqual(unchanged["existing_chunks"], 3)
+        self.assertEqual(len(self.embedding.inputs), embedding_count)
+
+        second_hash = hashlib.sha256(b"guide-v2").hexdigest()
+        updated = store.replace_source(
+            "project-a",
+            source_path,
+            second_hash,
+            source_records(source_path, second_hash, ["new pre-production rule", "new rollback rule"]),
+        )
+        self.assertEqual(updated["status"], "updated")
+        self.assertEqual(updated["replaced_chunks"], 3)
+        self.assertEqual(updated["chunks_stored"], 2)
+        results = store.list_memory("project-a", limit=10)
+        self.assertEqual(
+            {result["content"] for result in results},
+            {"new rollback rule", "new pre-production rule", "keep independent source"},
+        )
+        target_results = [result for result in results if result["metadata"].get("source_path") == source_path]
+        self.assertEqual(len(target_results), 2)
+        self.assertTrue(all(result["metadata"]["source_hash"] == second_hash for result in target_results))
+
+        with closing(store._get_connection()) as conn:
+            self.assertEqual(
+                conn.execute("SELECT count(*) FROM memories WHERE session_id = ?", ("project-a",)).fetchone()[0],
+                3,
+            )
+            self.assertEqual(
+                conn.execute("SELECT count(*) FROM memory_source_chunks").fetchone()[0],
+                3,
+            )
+            manifest = conn.execute(
+                "SELECT source_hash, chunk_count FROM memory_sources WHERE session_id = ? AND source_path = ?",
+                ("project-a", source_path),
+            ).fetchone()
+            self.assertEqual((manifest["source_hash"], manifest["chunk_count"]), (second_hash, 2))
+            self.assertEqual(conn.execute("SELECT count(*) FROM vec_memories_2").fetchone()[0], 3)
+
+        embed_count = len(self.embedding.inputs)
+        reopened = self.make_store()
+        persisted = reopened.replace_source(
+            "project-a",
+            source_path,
+            second_hash,
+            source_records(source_path, second_hash, ["new pre-production rule", "new rollback rule"]),
+        )
+        self.assertEqual(persisted["status"], "unchanged")
+        self.assertEqual(len(self.embedding.inputs), embed_count)
+
+    def test_failed_source_replacement_keeps_previous_source_intact(self):
+        store = self.make_store()
+        source_path = "docs/guide.md"
+        old_hash = hashlib.sha256(b"stable").hexdigest()
+        store.replace_source("project-a", source_path, old_hash, source_records(source_path, old_hash, ["existing fact"]))
+
+        self.embedding.default = [0.0, 0.0]
+        new_hash = hashlib.sha256(b"changed").hexdigest()
+        with self.assertRaises(MemoryStoreError):
+            store.replace_source("project-a", source_path, new_hash, source_records(source_path, new_hash, ["replacement fact"]))
+
+        result = store.list_memory("project-a", limit=10)
+        self.assertEqual([memory["content"] for memory in result], ["existing fact"])
+        self.assertEqual(result[0]["metadata"]["source_hash"], old_hash)
+        with closing(store._get_connection()) as conn:
+            manifest = conn.execute(
+                "SELECT source_hash FROM memory_sources WHERE session_id = ? AND source_path = ?",
+                ("project-a", source_path),
+            ).fetchone()
+            self.assertEqual(manifest["source_hash"], old_hash)
 
     def test_data_survives_reopening_and_metadata_is_not_shared(self):
         store = self.make_store()

@@ -2,10 +2,10 @@
 
 This repository holds two components with separate runtimes, providers, and threat models. Discuss scope before introducing product behavior, external services, or new runtime dependencies.
 
-| Component    | Path           | Runtime                    | Capability                                                                   |
-| ------------ | -------------- | -------------------------- | ---------------------------------------------------------------------------- |
-| `cela.sh`    | `src/cela_sh/` | Python 3.11+, local Ollama | Returns a validated JSON plan. Never executes.                               |
-| `ccelia2027` | `ccelia2027/`  | Cloudflare Worker          | Reads public HTTPS pages. Never logs in, clicks, types, submits, or mutates. |
+| Component    | Path           | Runtime                                                | Capability                                                                   |
+| ------------ | -------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `cela.sh`    | `src/cela_sh/` | Python 3.11+, local Ollama or single-operator cloud VM | Returns a validated JSON plan. Never executes.                               |
+| `ccelia2027` | `ccelia2027/`  | Cloudflare Worker                                      | Reads public HTTPS pages. Never logs in, clicks, types, submits, or mutates. |
 
 They do not call one another and share no credentials. Do not add a runtime link, a shared secret, or a shared data store without a design discussion first: either one changes the threat model of the whole repository.
 
@@ -45,7 +45,7 @@ Read [docs/extension-guide.md](docs/extension-guide.md) before extending anythin
 - Pin npm dependencies through the lockfile; `.npmrc` sets `save-exact=true`.
 - Do not commit secrets, generated output, model weights, or personal data.
 - Document Cloudflare bindings, environment variables, and deployment requirements without including secret values.
-- Keep the version string in sync across `pyproject.toml`, `ccelia2027/package.json`, `docs/architecture.md`, and `docs/protocol.md`.
+- Keep the version string in sync across all eight versioned files: `pyproject.toml`, `ccelia2027/package.json`, the root metadata in `ccelia2027/package-lock.json`, `docs/architecture.md`, `docs/protocol.md`, `docs/api-errors.md`, `SECURITY.md`, and `src/cela_sh/server.py`. `tests/test_version_consistency.py` enforces this list.
 - Do not claim a feature works until code, tests, and documentation support it. If something is unverified on the target machine, say so.
 
 ## License

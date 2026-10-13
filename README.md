@@ -2,7 +2,7 @@
 
 ## مخطط التخطيط المحلي cela.sh
 
-نظام تخطيط محلي قابل لإعادة الاستخدام: CLI وAPI محلية، إعداد مركزي، وOllama مع ذاكرة اختيارية عبر `sqlite-vec` الرسمي أو Qdrant. يستقبل هدفاً وسياقاً نصياً، ويتحقق من الخطة ويصنفها. لا يلتقط الشاشة ولا ينفذ النقرات أو الأوامر؛ كل مخرجاته `dry_run=true` و`execution_enabled=false`.
+نظام تخطيط محلي أولًا وقابل لإعادة الاستخدام: CLI محلية وAPI اختيارية يمكن تشغيلها على VM سحابية، إعداد مركزي، وOllama مع ذاكرة اختيارية عبر `sqlite-vec` الرسمي أو Qdrant. يستقبل هدفاً وسياقاً نصياً، ويتحقق من الخطة ويصنفها. لا يلتقط الشاشة ولا ينفذ النقرات أو الأوامر؛ كل مخرجاته `dry_run=true` و`execution_enabled=false`.
 
 ## المستودع كنظام واحد
 
@@ -11,7 +11,7 @@
 - `cela.sh`: مخطط محلي بـ Python وOllama، يعيد خطة JSON فقط ولا ينفذها.
 - `ccelia2027/`: واجهة ويب وCloudflare Worker لقراءة صفحات HTTPS عامة فقط عبر جلسات Browser Run قصيرة ومعزولة.
 
-هما مكوّنان للمنتج نفسه لكنهما ليسا خدمة واحدة وقت التشغيل: لا يستدعي Worker مخطط Python، ولا يستخدم Python أسرار Cloudflare أو Browser Run. مخططاهما ومزوّداهما مختلفان عمداً؛ CI والجودة والتوثيق وإدارة الاعتماديات هي الطبقة الموحدة للمستودع. راجع [معمارية النظام](docs/system-architecture.md).
+هما مكوّنان للمنتج نفسه لكنهما ليسا خدمة واحدة وقت التشغيل: لا يستدعي Worker مخطط Python، ولا يستخدم Python أسرار Cloudflare أو Browser Run. يمكن نشر API Python منفصلة على Linux VM باستخدام Docker Compose؛ تبقى على Ollama خاص ومفتاح Bearer واحد، ولا يوجد نشر سحابي حي أو تكامل تلقائي. مخططا Worker وPython ومزوّداهما مختلفان عمداً؛ CI والجودة والتوثيق وإدارة الاعتماديات هي الطبقة الموحدة للمستودع. راجع [معمارية النظام](docs/system-architecture.md) و[دليل النشر السحابي](docs/cloud-deployment.md).
 
 لتثبيت وفحص المستودع كاملًا، يلزم Python 3.11+ وBash وNode.js 22.13+ مع npm:
 
@@ -56,6 +56,16 @@ docker compose exec ollama ollama pull nomic-embed-text
 bash ./cela.sh --goal "تابع موضوع التخطيط" --session-id "جلسة-123"
 ```
 
+أضف ملاحظة أو تصحيحًا ووسومًا باختيارك، ثم استرجعه في التخطيط بمعرّف الجلسة نفسه:
+
+```bash
+bash ./cela.sh learn --session-id "project-notes" --type correction --tag testing --content "لا تستخدم production أثناء الاختبارات."
+bash ./cela.sh --goal "جهّز خطوات اختبار الإصدار" --session-id "project-notes"
+bash ./cela.sh search --session-id "project-notes" --tag testing
+```
+
+تدعم الذاكرة نطاق `project` لكل `session-id` و`global` مشتركًا بين المشاريع؛ يسترجع التخطيط النطاقين تلقائيًا. يمكن استيراد ملفات `.md` و`.txt` وPDF نصّي عبر `learn-file`، مع تثبيت `python -m pip install '.[documents]'` لدعم PDF. يتتبع الاستيراد مسار المصدر وبصمات الملف والمقاطع: تكرار الملف دون تغيير لا يعيد الفهرسة، وتعديل الملف يستبدل مقاطعه السابقة. يظل هذا RAG/ذاكرة مستمرة لا تدريبًا لأوزان النموذج، ولا تُحفظ المحادثات أو الخطط تلقائيًا. راجع [دليل بناء المعرفة المحلية](docs/learning.md) للتشغيل والحدود.
+
 يثبّت المشروع مكتبة `sqlite-vec` الرسمية. البحث cosine يتم داخل `vec0` باستخدام `MATCH`، مع ترشيح الجلسة قبل top-k. تُرحّل القواعد القديمة تلقائيًا بمعاملة ذرية دون إعادة embedding؛ **انسخها احتياطيًا قبل أول فتح بالإصدار الجديد**. راجع [دليل التخزين والترحيل](docs/docker-deployment.md#التخزين-والترحيل).
 
 لتفعيل استرجاع Qdrant بدلًا منه، عيّن المتغيرات في بيئة العملية:
@@ -84,6 +94,8 @@ print(plan.model_dump_json(indent=2))
 
 ```bash
 bash ./cela.sh services-up-api
+# على VM سحابية، عيّن CELA_API_KEY في .env واستخدم بدلًا منه:
+# bash ./cela.sh services-up-cloud
 docker compose exec ollama ollama pull qwen2.5:3b
 docker compose exec ollama ollama pull nomic-embed-text
 curl --fail http://127.0.0.1:8000/health
@@ -91,15 +103,15 @@ curl --fail http://127.0.0.1:8000/health
 
 تشغّل خدمة `cela-sh-api` الاختيارية ضمن profile `api`، مع صورة متعددة المراحل ومستخدم غير root وvolume دائم للذاكرة. العقد في `/docs`؛ المسارات `/plan` و`/memory` و`/memory/search` تعيد التخطيط الجاف والذاكرة المعزولة فقط. الكتابة إلى الذاكرة صريحة، لا نتيجة جانبية للتخطيط.
 
-**لا توجد مصادقة API بعد**؛ Compose ينشر المنافذ على loopback فقط، و`session_id` ليس تفويضًا. `/health` لا يثبت تنزيل النماذج. التشغيل والإعداد والنسخ الاحتياطية والقيود في [دليل Docker](docs/docker-deployment.md).
+المصادقة اختيارية محليًا؛ تعيين `CELA_API_KEY` يفرض Bearer token على `/plan` و`/memory` و`/memory/search`. Overlay السحابة يفرض المفتاح، ويبقي المنفذ على loopback خلف TLS ingress. المفتاح مشترك لمشغّل موثوق واحد و`session_id` ليس تفويضًا. `/health` لا يثبت تنزيل النماذج. التشغيل المحلي والنسخ الاحتياطية في [دليل Docker](docs/docker-deployment.md)، والنشر السحابي في [دليله](docs/cloud-deployment.md).
 
 كل فشل في API له شكل واستقرار محدّدان: أخطاء التطبيق تعيد `{"error":{"code":"...","message":"..."}}` برمز وجملة ثابتة، وأخطاء الإطار (تحقق جسم الطلب، 404، 405) تعيد `{"detail":...}` القياسية. الاستثناءات غير المتوقعة تعيد `500` بـ`internal_error` دون نصّ الاستثناء أو نوعه أو الـtraceback. الجدول الكامل والحدود وملحق التحقق في **[عقد أخطاء API](docs/api-errors.md)** — وهو المرجع الوحيد؛ لا تُضف نسخة ثانية منه هنا.
 
 ## بنية المشروع
 
 - `cela.sh`: واجهة تشغيل موحدة للتثبيت والاختبار والخدمات والتخطيط وبوابة `preflight`.
-- `Dockerfile` و`docker-compose.yml`: صورة API متعددة المراحل، وOllama، وQdrant الاختياري.
-- `src/cela_sh/server.py`: API محلية اختيارية؛ تُثبت عبر `pip install -e '.[server]'`.
+- `Dockerfile` و`docker-compose.yml` و`docker-compose.cloud.yml`: صورة API متعددة المراحل، وOllama، وQdrant الاختياري، وoverlay سحابي يفرض Bearer auth.
+- `src/cela_sh/server.py`: API اختيارية محلية أو سحابية بمفتاح Bearer عند تفعيله؛ تُثبت عبر `pip install -e '.[server]'`.
 - `src/cela_sh/settings.py`: إعدادات البيئة والتحقق منها.
 - `src/cela_sh/factory.py`: تركيب الخدمات والمزودات دون ربط المستهلك بتفاصيل Qdrant.
 - `src/cela_sh/planner/`: عقد المخطط (`Planner`)، سجل مزودي التخطيط المحليين (`registry.py`)، مخططات البيانات، عميل Ollama، والسياسة المستقلة.
@@ -143,7 +155,8 @@ git diff tests/snapshots/api_surface.json
 ## حدود الأمان والحالة
 
 - Ollama محصور على loopback افتراضيًا. الاستثناء الصريح `CELA_ALLOW_OLLAMA_CONTAINER_HOST=true` يسمح باسم خدمة `ollama` فقط داخل شبكة Docker موثوقة؛ redirects والبروكسيات البيئية معطلة.
-- عنوان Qdrant البعيد يتطلب HTTPS ومفتاح API. لا تنشر منافذ الخدمات على الإنترنت.
+- عنوان Qdrant البعيد يتطلب HTTPS ومفتاح API. منافذ API وOllama تبقى على host loopback؛ استخدم TLS proxy للـAPI.
+- المصادقة السحابية مفتاح Bearer مشترك لمشغّل واحد، وليست هوية أو تفويضًا لكل `session_id`؛ لا تضعه في متصفح ولا تشارك الخدمة قبل إضافة Auth/Z وحدود معدل متعددة المستخدمين.
 - صورة Ollama تستخدم tag محددًا؛ ثبّت digests معتمدة لـ`PYTHON_IMAGE` و`OLLAMA_IMAGE` قبل نشر مُدار. Qdrant الاختياري يستخدم `latest` للتجربة المحلية، ويمكن تجاوزه بـ`QDRANT_IMAGE`.
 - مدخلات السياق والذكريات غير موثوقة؛ تصنيف السياسة أولي ولا يثبت سلامة الخطة.
 - لا توجد طبقة إدراك أو تنفيذ. الخطة `ready` ليست موافقة ولا إذناً بالفعل.

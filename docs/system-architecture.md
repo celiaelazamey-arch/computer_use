@@ -17,9 +17,9 @@
 
 ## المكوّن المحلي
 
-الحزمة `cela-sh` تعمل عبر `bash ./cela.sh` أو `python -m cela_sh` أو API اختيارية. تستخدم Ollama على loopback افتراضيًا، أو اسم خدمة Docker `ollama` عند السماح الصريح؛ وتسمح بـsqlite-vec الرسمي أو Qdrant مع عزل الجلسات. المخطط والسياسة يصنفان الأفعال، لكن لا توجد طبقة تنفيذ أو تحكم بالواجهة. كل خطة تحمل `dry_run=true` و`execution_enabled=false`؛ و`ready` لا يعني إذنًا بالفعل.
+الحزمة `cela-sh` تعمل عبر `bash ./cela.sh` أو `python -m cela_sh` أو API اختيارية. تستخدم Ollama على loopback افتراضيًا، أو اسم خدمة Docker `ollama` عند السماح الصريح؛ وتسمح بـsqlite-vec الرسمي أو Qdrant مع نطاقي project/global. يمكن للمشغّل إضافة ملاحظات وتصحيحات موسومة، أو استيراد Markdown/text/PDF محلي عبر `learn-file`، والبحث فيها بأمر `search`. استيراد الملف idempotent حسب نطاقه ومساره وبصمته؛ المحتوى المعدّل يستبدل مقاطع المصدر القديمة، بينما تُحفظ المراجع إلى ملفات مختلفة منفصلة. التخطيط يدمج معرفة المشروع والعامة ويقدّم التصحيحات ذات الصلة؛ هذا RAG ولا يغيّر أوزان النموذج. المخطط والسياسة يصنفان الأفعال، لكن لا توجد طبقة تنفيذ أو تحكم بالواجهة. كل خطة تحمل `dry_run=true` و`execution_enabled=false`؛ و`ready` لا يعني إذنًا بالفعل.
 
-الاختبارات في `tests/` تستخدم embeddings حتمية مع vec0 الحقيقي، وبدائل HTTP؛ لا تحتاج Ollama أو Qdrant. الصورة متعددة المراحل تشغّل API كمستخدم غير root، وتنشرها على loopback فقط دون مصادقة بعد؛ التفاصيل في [دليل Docker](docker-deployment.md). `bash ./cela.sh probe` و`probe-memory` فحوص حية اختيارية ويجب تشغيلهما صراحةً على الجهاز المقصود.
+الاختبارات في `tests/` تستخدم embeddings حتمية مع vec0 الحقيقي، وبدائل HTTP؛ لا تحتاج Ollama أو Qdrant. الصورة متعددة المراحل تشغّل API كمستخدم غير root. محليًا تبقى المنافذ على loopback والمصادقة اختيارية؛ `docker-compose.cloud.yml` يفرض Bearer key للنشر أحادي المشغّل على Linux VM مع TLS ingress، ولا ينشئ بنية سحابية تلقائيًا. التفاصيل في [دليل Docker](docker-deployment.md) و[دليل النشر السحابي](cloud-deployment.md). `bash ./cela.sh probe` و`probe-memory` فحوص حية اختيارية ويجب تشغيلهما صراحةً على الجهاز المقصود.
 
 ## المكوّن المستضاف
 
@@ -29,10 +29,10 @@
 
 ## حدود الثقة والبيانات
 
-- Python لا يرسل بياناته إلى Worker، وWorker لا يتصل بخدمة Ollama المحلية.
-- أسرار Cloudflare وبيانات التطبيق تخص GitHub Actions/Cloudflare فقط، ولا تدخل بيئة Python.
+- Python لا يرسل بياناته إلى Worker، وWorker لا يتصل بخدمة Python أو Ollama، سواء كانت على الجهاز أو VM.
+- أسرار Cloudflare وبيانات التطبيق تخص GitHub Actions/Cloudflare فقط، ولا تدخل بيئة Python. مفتاح API Python منفصل ويُدار على VM/مدير أسرار، لا في Worker.
 - نص الهدف والسياق والذاكرة غير موثوق. الخطة تحتاج تحققًا وقاعدة رفض مستقلة عن النموذج.
-- SQLite/Qdrant يحتويان ذاكرة جلسة عند التفعيل والكتابة الصريحة فقط. Worker Durable Object يحتفظ بعدادات الاستخدام اليومية لا بنص المهام.
+- SQLite/Qdrant يخزّنان معرفة project/global فقط بعد كتابة صريحة عبر `learn` أو `learn-file` أو `/memory`؛ لا تحفظ محادثات أو خطط تلقائيًا. الذاكرة العامة مشتركة بين المشاريع على المخزن نفسه، والاستيراد محلي بلا جلب ويب. Worker Durable Object يحتفظ بعدادات الاستخدام اليومية لا بنص المهام.
 - اختبارات CI لا تشغّل Ollama أو Browser Run أو NVIDIA ولا تنشر الإنتاج.
 
 ## تشغيل وصيانة موحّدان

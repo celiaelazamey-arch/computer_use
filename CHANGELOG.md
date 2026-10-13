@@ -2,7 +2,31 @@
 
 This project keeps **one current version** and no historical release line. `main` is the only development branch: superseded behavior is removed rather than deprecated, and there are no backports. The current version is tagged on `main` at the merge commit of the release.
 
-The version string is identical in **six** places, and `tests/test_version_consistency.py` fails the build when they drift: `pyproject.toml`, `ccelia2027/package.json`, `docs/architecture.md`, `docs/protocol.md`, `SECURITY.md` (supported-versions table), and `src/cela_sh/server.py` (the FastAPI `version=`, which is published to callers through `/openapi.json` and `/docs`). Bumping only the first four leaves the public OpenAPI contract advertising a stale version.
+The version string is identical in **eight** files, and `tests/test_version_consistency.py` fails the build when they drift: `pyproject.toml`, `ccelia2027/package.json` and its root `package-lock.json` metadata, `docs/architecture.md`, `docs/protocol.md`, `docs/api-errors.md`, `SECURITY.md` (supported-versions table), and `src/cela_sh/server.py` (the FastAPI `version=`, which is published to callers through `/openapi.json` and `/docs`). Bumping only package metadata leaves the public OpenAPI contract advertising a stale version.
+
+## 1.0.2
+
+### Security
+
+- `cela.sh`: added optional constant-time Bearer authentication for planning and explicit memory routes using `CELA_API_KEY`; health and API documentation remain public. The configured key is validated and omitted from `Settings` representations.
+- `cela.sh`: documented that the shared key is suitable only for a trusted single operator. It does not grant per-user memory authorization, and no application-level rate limiter is provided.
+
+### Deployment
+
+- Added a provider-neutral Docker Compose overlay for single-operator Linux VMs. It requires an API key and keeps API/Ollama host ports on loopback; TLS termination, firewall rules, persistent storage, and backups are operator responsibilities.
+- Added `bash ./cela.sh services-up-cloud` and a deployment guide. The Cloudflare Worker remains independent; no cloud resource or live deployment is created by CI.
+
+### Local knowledge
+
+- Expanded the explicit local RAG flow with `learn`, `learn-file`, and `search`; records support `note`/`correction` types, multi-value tags, and project/global scopes. Corrections are prioritized for planning, global knowledge is combined with project memory, and local Markdown/text/PDF files are chunked with provenance metadata.
+- `learn-file` now uses Replace-by-Source: per-chunk `content_hash` plus a file SHA-256 and safe relative source path make an unchanged import idempotent; changed content replaces the prior source chunks. SQLite applies the replacement in one transaction; Qdrant upserts deterministic point IDs then removes stale chunks.
+- PDF parsing is an optional `pypdf` extra; no new always-installed runtime dependency or paid API is required. The feature stores user-selected knowledge and does not modify model weights or save conversations/plans automatically.
+- Documented import replacement, source-path privacy, data retention, global sharing, and backend consistency boundaries in `docs/learning.md`.
+
+### Documentation and checks
+
+- Updated the API error contract for the stable `401 authentication_required` response and added offline auth/Compose tests.
+- Added `docs/api-errors.md` and the npm lockfile metadata to the version consistency guard, bringing the complete version inventory to eight files.
 
 ## 1.0.1
 
