@@ -28,6 +28,8 @@ bash ./cela.sh preflight
 4. Run `bash ./cela.sh preflight`.
 5. Open a pull request with the template and resolve review conversations.
 
+For work handed between sessions, follow the [session contract](docs/development/session-contract.md); in particular, verify the fetched remote HEAD rather than relying only on a successful push.
+
 ## The rules that do not bend
 
 Read [docs/extension-guide.md](docs/extension-guide.md) before extending anything. In short:
