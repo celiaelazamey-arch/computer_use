@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, call, patch
 
@@ -10,6 +11,13 @@ from cela_sh.cli import main
 from cela_sh.memory import MemoryStoreError
 from cela_sh.memory.scopes import GLOBAL_MEMORY_SESSION_ID
 from cela_sh.settings import ConfigurationError, Settings
+
+
+def assert_recorded_at(value: object) -> None:
+    try:
+        datetime.fromisoformat(str(value))
+    except (TypeError, ValueError) as exc:
+        raise AssertionError(f"recorded_at is not ISO-8601: {value!r}") from exc
 
 
 class LearningCliTests(unittest.TestCase):
@@ -52,9 +60,11 @@ class LearningCliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         factory.assert_called_once_with(settings)
-        store.add_memory.assert_called_once_with(
-            "project-notes",
-            "Never use production during tests.",
+        stored_session, stored_content, stored_metadata = store.add_memory.call_args.args
+        self.assertEqual(stored_session, "project-notes")
+        self.assertEqual(stored_content, "Never use production during tests.")
+        self.assertEqual(
+            {key: value for key, value in stored_metadata.items() if key != "recorded_at"},
             {
                 "scope": "project",
                 "type": "correction",
@@ -62,6 +72,7 @@ class LearningCliTests(unittest.TestCase):
                 "source": "explicit_cli_learning",
             },
         )
+        assert_recorded_at(stored_metadata["recorded_at"])
         planner.generate_plan.assert_not_called()
         self.assertEqual(
             json.loads(stdout.getvalue()),
@@ -85,9 +96,11 @@ class LearningCliTests(unittest.TestCase):
             exit_code = main(["learn", "--scope", "global", "--content", "Shared rule."])
 
         self.assertEqual(exit_code, 0)
-        store.add_memory.assert_called_once_with(
-            GLOBAL_MEMORY_SESSION_ID,
-            "Shared rule.",
+        stored_session, stored_content, stored_metadata = store.add_memory.call_args.args
+        self.assertEqual(stored_session, GLOBAL_MEMORY_SESSION_ID)
+        self.assertEqual(stored_content, "Shared rule.")
+        self.assertEqual(
+            {key: value for key, value in stored_metadata.items() if key != "recorded_at"},
             {
                 "scope": "global",
                 "type": "note",
@@ -95,6 +108,7 @@ class LearningCliTests(unittest.TestCase):
                 "source": "explicit_cli_learning",
             },
         )
+        assert_recorded_at(stored_metadata["recorded_at"])
         self.assertNotIn("session_id", json.loads(stdout.getvalue()))
 
     def test_learning_requires_an_enabled_memory_backend(self):
@@ -178,11 +192,14 @@ class LearningCliTests(unittest.TestCase):
             exit_code = main(["learn", "--session-id", "notes", "--content", "-"])
 
         self.assertEqual(exit_code, 0)
-        store.add_memory.assert_called_once_with(
-            "notes",
-            "A multi-line\nnote.\n",
+        stored_session, stored_content, stored_metadata = store.add_memory.call_args.args
+        self.assertEqual(stored_session, "notes")
+        self.assertEqual(stored_content, "A multi-line\nnote.\n")
+        self.assertEqual(
+            {key: value for key, value in stored_metadata.items() if key != "recorded_at"},
             {"scope": "project", "type": "note", "tags": [], "source": "explicit_cli_learning"},
         )
+        assert_recorded_at(stored_metadata["recorded_at"])
 
     def test_oversized_stdin_is_rejected_before_initializing_memory(self):
         stderr = io.StringIO()

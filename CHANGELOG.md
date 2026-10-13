@@ -6,6 +6,14 @@ The version string is identical in **eight** files, and `tests/test_version_cons
 
 ## Unreleased
 
+### Project decision memory and brief
+
+- `cela.sh`: three new engineering memory types on top of `note`/`correction` — `decision` (mandatory `--reason`, repeatable `--rejected` alternatives capped at 10, lifecycle status `active`/`superseded`/`deprecated`/`rejected` with `--superseded-by` required when superseded), `failure` (optional `--why` cause), and `debt`. All new explicit-learning records now carry a `recorded_at` timestamp, which becomes the base of the knowledge timeline.
+- `cela.sh`: new `brief` command (`cela.sh brief --session-id <id> [--text]`) rebuilds the project brief from stored memory — goal, active decisions with rationale and rejected alternatives, closed decisions with what superseded them, past failures, technical debt, next steps, per-section counts, and the recorded-time range. It is deterministic, needs no model, no embedding, and no Ollama (works while Ollama is down), and reports an empty project honestly instead of inventing context. Project goal and next steps are notes tagged `goal`/`next`.
+- `cela.sh`: approved-plan capture — `cela.sh learn --from-plan <plan.json>` validates the plan against the strict `Plan` model and stores its analysis as an active decision using replace-by-source on the plan file (unchanged re-import reports `unchanged`; an edited plan replaces the previous decision). The rationale is derived from the file's provenance, never fabricated.
+- Stored decisions participate in planning retrieval automatically, like all session memory; the HTTP API (`/memory`, `/memory/search`) still accepts `note`/`correction` only in this stage.
+- API surface snapshot updated for the new `learn` flags and the `brief` subcommand (additive; no flag, route, or exit code removed).
+
 ### Fault isolation and free-tier scaling
 
 - `cela.sh`: removed the process-wide request lock. Planner, embedding, and Qdrant HTTP clients now use per-thread pooled sessions behind one stable handle (`cela_sh.thread_sessions`); the SQLite store already used short-lived connections, so concurrent requests run in parallel with bounded thread-pool backpressure (`CELA_MAX_CONCURRENT_REQUESTS`, default 40).

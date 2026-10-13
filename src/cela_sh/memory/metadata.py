@@ -4,7 +4,8 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-MEMORY_TYPES = ("note", "correction")
+MEMORY_TYPES = ("note", "correction", "decision", "failure", "debt")
+DECISION_STATUSES = ("active", "superseded", "deprecated", "rejected")
 MAX_TAGS = 20
 MAX_TAG_LENGTH = 64
 _TAG_PATTERN = re.compile(r"[\w.-]+", flags=re.UNICODE)
@@ -16,6 +17,15 @@ def normalize_memory_type(value: str | None) -> str:
         return "note"
     if not isinstance(value, str) or value not in MEMORY_TYPES:
         raise ValueError(f"type must be one of: {', '.join(MEMORY_TYPES)}")
+    return value
+
+
+def normalize_decision_status(value: str | None) -> str:
+    """Return a supported decision lifecycle status, defaulting to ``active``."""
+    if value is None:
+        return "active"
+    if not isinstance(value, str) or value not in DECISION_STATUSES:
+        raise ValueError(f"status must be one of: {', '.join(DECISION_STATUSES)}")
     return value
 
 
